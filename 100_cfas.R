@@ -40,22 +40,16 @@ mem <- mplusModeler(mem_model,
 #### Executive Functioning
 
 exf_data <- tidied %>% 
-  dplyr::select(ADAMSSID,
-                vdexf2, vdexf8, vdexf9, vdasp1, vdasp2, vdasp3)
+  dplyr::select(ADAMSSID, vdexf8, vdexf9, vdasp1, vdasp3)
 
 psych::describe(exf_data)
 
 exf_model <- mplusObject(
   MODEL = "
   
-  exf BY vdexf2* vdexf8 vdexf9 vdasp1 vdasp2 vdasp3;
+  exf BY  vdexf8* vdexf9 vdasp1 vdasp3;
   exf@1;
   
-  trails BY vdexf2* (1);
-  trails BY vdasp2* (1);
-  trails@1;
-  
-  exf with trails@0;
   
   ",
   usevariables = colnames(exf_data),
