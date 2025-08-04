@@ -1,0 +1,104 @@
+rm(list = setdiff(ls(), lsf.str())[!(setdiff(ls(), lsf.str()) %in% "params")])
+user <- "zkunicki"
+source(here::here("001_libraries.R"))
+source(here::here("002_directories.R"))
+
+load(here::here(rds_path, "010_tidy-data.Rdata"))
+
+#### Memory
+
+mem_data <- tidied %>% 
+  dplyr::select(ADAMSSID,
+                vdmde1, vdmde2, vdmde3, vdmde4, vdmre1cat, vdmde6)
+
+psych::describe(mem_data)
+
+mem_model <- mplusObject(
+  MODEL = "
+  
+  mem BY vdmde1* vdmde2 vdmde3 vdmde4 vdmre1cat vdmde6;
+  mem@1;
+  
+  lm BY vdmde2* (1);
+  lm BY vdmde6* (1);
+  lm@1;
+  
+  mem with lm@0;
+  
+  ",
+  usevariables = colnames(mem_data),
+  VARIABLE = "idvariable = ADAMSSID;
+              CATEGORICAL ARE vdmde3 vdmre1cat;",
+  OUTPUT = "TECH4 STANDARDIZED SVALUES MODINDICES(ALL);",
+  ANALYSIS = "ESTIMATOR = WLSMV;
+              PARAMETERIZATION = THETA;",
+  rdata = mem_data)
+
+mem <- mplusModeler(mem_model, 
+                       modelout = "mem.inp", run = TRUE)
+
+#### Executive Functioning
+
+exf_data <- tidied %>% 
+  dplyr::select(ADAMSSID,
+                vdexf2, vdexf8, vdexf9, vdasp1, vdasp2, vdasp3)
+
+psych::describe(exf_data)
+
+exf_model <- mplusObject(
+  MODEL = "
+  
+  exf BY vdexf2* vdexf8 vdexf9 vdasp1 vdasp2 vdasp3;
+  exf@1;
+  
+  trails BY vdexf2* (1);
+  trails BY vdasp2* (1);
+  trails@1;
+  
+  dsp BY vdexf8* (2);
+  dsp BY vdexf9* (2);
+  dsp@1;
+  
+  exf with trails@0;
+  exf with dsp@0;
+  dsp with exf@0;
+  
+  ",
+  usevariables = colnames(exf_data),
+  VARIABLE = "idvariable = ADAMSSID;
+              CATEGORICAL = vdasp3;",
+  OUTPUT = "TECH4 STANDARDIZED SVALUES MODINDICES(ALL);",
+  ANALYSIS = "ESTIMATOR = WLSMV;
+              PARAMETERIZATION = THETA;",
+  rdata = exf_data)
+
+exf <- mplusModeler(exf_model, 
+                    modelout = "exf.inp", run = TRUE)
+
+#### Language
+
+#### Memory
+
+lfl_data <- tidied %>% 
+  dplyr::select(ADAMSSID,
+                vdlfl1, vdlfl2, vdlfl3, vdlfl4, vdlfl5, vdlfl7, vdlfl8)
+
+psych::describe(lfl_data)
+
+lfl_model <- mplusObject(
+  MODEL = "
+  
+  lfl BY vdlfl1* vdlfl2 vdlfl3 vdlfl4 vdlfl5 vdlfl7 vdlfl8;
+  lfl@1;
+  
+  ",
+  usevariables = colnames(lfl_data),
+  VARIABLE = "idvariable = ADAMSSID;
+              CATEGORICAL ARE vdlfl2 vdlfl3 vdlfl4 vdlfl5;",
+  OUTPUT = "TECH4 STANDARDIZED SVALUES MODINDICES(ALL);",
+  ANALYSIS = "ESTIMATOR = WLSMV;
+              PARAMETERIZATION = THETA;",
+  rdata = lfl_data)
+
+lfl <- mplusModeler(lfl_model, 
+                    modelout = "lfl.inp", run = TRUE)
