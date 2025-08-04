@@ -55,13 +55,7 @@ exf_model <- mplusObject(
   trails BY vdasp2* (1);
   trails@1;
   
-  dsp BY vdexf8* (2);
-  dsp BY vdexf9* (2);
-  dsp@1;
-  
   exf with trails@0;
-  exf with dsp@0;
-  dsp with exf@0;
   
   ",
   usevariables = colnames(exf_data),
