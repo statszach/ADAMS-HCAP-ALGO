@@ -239,6 +239,18 @@ vdvis1 <- ADAMS1AN_R %>%
   dplyr::mutate(ANCPTOT = na_if(ANCPTOT, 97)) %>% 
   dplyr::rename(vdvis1 = ANCPTOT)
 
+#### Functioning
+
+# Caregiver
+
+iqcode <- ADAMS1AG_R %>% 
+  dplyr::select(ADAMSSID, AGQ14:AGQ29) %>% 
+  dplyr::mutate(across(contains("AGQ"), ~ replace(.x, .x %in% c(7, 8), NA))) %>%
+  dplyr::mutate(iqcode_sum = rowSums(across(AGQ14:AGQ29), na.rm = TRUE)) %>% 
+  dplyr::select(ADAMSSID, iqcode_sum)
+  
+
+
 # Stacking it up
 
 tidied <- vdori1 %>% 
