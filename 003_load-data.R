@@ -15,4 +15,8 @@ ADAMS1TRK_R <- haven::read_dta(fs::path(data_filepath, "ADAMS1TRK_R.dta"))
 
 ADAMS1AG_R <- haven::read_sav(fs::path(data_filepath, "ADAMS1AG_R.sav"))
 
+## AD_R has the blessed
+
+ADAMS1AD_R <- haven::read_sav(fs::path(data_filepath, "ADAMS1AD_R.sav"))
+
 save.image(here::here(rds_path, "003_load-data.Rdata"))

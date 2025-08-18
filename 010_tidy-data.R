@@ -248,7 +248,16 @@ iqcode <- ADAMS1AG_R %>%
   dplyr::mutate(across(contains("AGQ"), ~ replace(.x, .x %in% c(7, 8), NA))) %>%
   dplyr::mutate(iqcode_sum = rowSums(across(AGQ14:AGQ29), na.rm = TRUE)) %>% 
   dplyr::select(ADAMSSID, iqcode_sum)
-  
+
+# clinician
+
+blessed <- ADAMS1AD_R %>% 
+  dplyr::select(ADAMSSID, ADBL1A, ADBL1B, ADBL1C,
+                ADBL1D, ADBL1E, ADBL1F, ADBL1G,
+                ADBL1H)  %>% 
+  dplyr::mutate(across(contains("ADBL"), ~ replace(.x, .x %in% c(97), NA))) %>%
+  dplyr::mutate(blessed_sum = rowSums(across(ADBL1A:ADBL1H), na.rm = TRUE)) %>% 
+  dplyr::select(ADAMSSID, blessed_sum)
 
 
 # Stacking it up
