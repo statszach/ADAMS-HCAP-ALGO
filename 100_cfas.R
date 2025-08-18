@@ -65,8 +65,6 @@ exf <- mplusModeler(exf_model,
 
 #### Language
 
-#### Memory
-
 lfl_data <- tidied %>% 
   dplyr::select(ADAMSSID,
                 vdlfl1, vdlfl2, vdlfl3, vdlfl4, vdlfl5, vdlfl7, vdlfl8)
