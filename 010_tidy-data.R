@@ -246,8 +246,8 @@ vdvis1 <- ADAMS1AN_R %>%
 iqcode <- ADAMS1AG_R %>% 
   dplyr::select(ADAMSSID, AGQ14:AGQ29) %>% 
   dplyr::mutate(across(contains("AGQ"), ~ replace(.x, .x %in% c(7, 8), NA))) %>%
-  dplyr::mutate(iqcode_sum = rowSums(across(AGQ14:AGQ29), na.rm = TRUE)) %>% 
-  dplyr::select(ADAMSSID, iqcode_sum)
+  dplyr::mutate(iqcode_mean = rowMeans(across(AGQ14:AGQ29), na.rm = TRUE)) %>% 
+  dplyr::select(ADAMSSID, iqcode_mean)
 
 # clinician
 
@@ -259,6 +259,14 @@ blessed <- ADAMS1AD_R %>%
   dplyr::mutate(blessed_sum = rowSums(across(ADBL1A:ADBL1H), na.rm = TRUE)) %>% 
   dplyr::select(ADAMSSID, blessed_sum)
 
+checkblessedhcap <- hc16hp_i %>% 
+  dplyr::select(INF1BL1_1, INF1BL1_2, INF1BL1_3, INF1BL1_4, INF1BL1_5,
+                INF1BL1_6, INF1BL1_7, INF1BL1_8) %>% 
+  dplyr::mutate(across(contains("INF1"), ~ replace(.x, .x %in% c(8, 9), NA))) %>%
+  dplyr::mutate(blessed_sum = rowSums(across(INF1BL1_1:INF1BL1_8), na.rm = TRUE)/3)
+  
+psych::describe(checkblessedhcap$blessed_sum)
+psych::describe(hc16hp_i$INF1BL1_SCORE)
 
 # Stacking it up
 
