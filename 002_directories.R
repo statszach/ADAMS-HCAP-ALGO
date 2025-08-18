@@ -6,7 +6,7 @@ if (user == "Emma"){
   code_filepath <- "C:\\Users\\emmanich\\code\\ADAMS-HCAP-ALGO\\"
 } else if (user == "zkunicki"){
   data_filepath <- "R:\\STUDIES\\HRSADAMS\\data\\SOURCE"
-  rds_path <- "C:\\Users\\zkunicki\\OneDrive - Brown University\\Documents\\HomeMigration\\Research\\HRSADAMS\\PROJECTS\\ADAMS-HCAP-ALGO\\Images"
+  rds_filepath <- "C:\\Users\\zkunicki\\OneDrive - Brown University\\Documents\\HomeMigration\\Research\\HRSADAMS\\PROJECTS\\ADAMS-HCAP-ALGO\\Images"
   images_path <- "C:\\Users\\zkunicki\\OneDrive - Brown University\\Documents\\HomeMigration\\Research\\HRSADAMS\\PROJECTS\\ADAMS-HCAP-ALGO\\RDS"
   code_filepath <- ""
 }

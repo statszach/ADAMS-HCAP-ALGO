@@ -1,9 +1,9 @@
 rm(list = setdiff(ls(), lsf.str())[!(setdiff(ls(), lsf.str()) %in% "params")])
-user <- "zkunicki"
-source(here::here("001_libraries.R"))
-source(here::here("002_directories.R"))
+user <- "Emma"; code_filepath <- "C:\\Users\\emmanich\\code\\ADAMS-HCAP-ALGO\\"
+source(here::here(paste0(code_filepath, "001_libraries.R")))
+source(here::here(paste0(code_filepath, "002_directories.R")))
 
-load(here::here(rds_path, "010_tidy-data.Rdata"))
+load(here::here(rds_filepath, "010_tidy-data.Rdata"))
 
 #### Memory
 
@@ -64,8 +64,6 @@ exf <- mplusModeler(exf_model,
                     modelout = "exf.inp", run = TRUE)
 
 #### Language
-
-#### Memory
 
 lfl_data <- tidied %>% 
   dplyr::select(ADAMSSID,

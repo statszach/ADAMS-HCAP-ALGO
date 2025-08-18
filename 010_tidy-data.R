@@ -1,9 +1,9 @@
 rm(list = setdiff(ls(), lsf.str())[!(setdiff(ls(), lsf.str()) %in% "params")])
-user <- "zkunicki"
-source(here::here("001_libraries.R"))
-source(here::here("002_directories.R"))
+user <- "Emma"; code_filepath <- "C:\\Users\\emmanich\\code\\ADAMS-HCAP-ALGO\\"
+source(here::here(paste0(code_filepath, "001_libraries.R")))
+source(here::here(paste0(code_filepath, "002_directories.R")))
 
-load(here::here(rds_path, "003_load-data.Rdata"))
+load(here::here(rds_filepath, "003_load-data.Rdata"))
 
 #### Orientation
 
@@ -259,14 +259,16 @@ blessed <- ADAMS1AD_R %>%
   dplyr::mutate(blessed_sum = rowSums(across(ADBL1A:ADBL1H), na.rm = TRUE)) %>% 
   dplyr::select(ADAMSSID, blessed_sum)
 
-checkblessedhcap <- hc16hp_i %>% 
-  dplyr::select(INF1BL1_1, INF1BL1_2, INF1BL1_3, INF1BL1_4, INF1BL1_5,
-                INF1BL1_6, INF1BL1_7, INF1BL1_8) %>% 
-  dplyr::mutate(across(contains("INF1"), ~ replace(.x, .x %in% c(8, 9), NA))) %>%
-  dplyr::mutate(blessed_sum = rowSums(across(INF1BL1_1:INF1BL1_8), na.rm = TRUE)/3)
+## Check how to score blessed
+
+# checkblessedhcap <- hc16hp_i %>% 
+#   dplyr::select(INF1BL1_1, INF1BL1_2, INF1BL1_3, INF1BL1_4, INF1BL1_5,
+#                 INF1BL1_6, INF1BL1_7, INF1BL1_8) %>% 
+#   dplyr::mutate(across(contains("INF1"), ~ replace(.x, .x %in% c(8, 9), NA))) %>%
+#   dplyr::mutate(blessed_sum = rowSums(across(INF1BL1_1:INF1BL1_8), na.rm = TRUE)/3)
   
-psych::describe(checkblessedhcap$blessed_sum)
-psych::describe(hc16hp_i$INF1BL1_SCORE)
+# psych::describe(checkblessedhcap$blessed_sum)
+# psych::describe(hc16hp_i$INF1BL1_SCORE)
 
 # Stacking it up
 
@@ -293,4 +295,4 @@ tidied <- vdori1 %>%
   left_join(vdvis1, by = "ADAMSSID") %>% 
   labelled::remove_labels()
 
-save.image(here::here(rds_path, "010_tidy-data.Rdata"))
+save.image(here::here(rds_filepath, "010_tidy-data.Rdata"))
