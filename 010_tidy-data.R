@@ -270,29 +270,78 @@ blessed <- ADAMS1AD_R %>%
 # psych::describe(checkblessedhcap$blessed_sum)
 # psych::describe(hc16hp_i$INF1BL1_SCORE)
 
+#### Dementia diagnosis
+
+dementia <- ADAMS1AD_R %>%
+  dplyr::select(ADAMSSID, ADFDX1) %>%
+  dplyr::mutate(diagnosis = case_when(ADFDX1 == 1 ~ "Probable AD", 
+                                      ADFDX1 == 2 ~ "Possible AD", 
+                                      ADFDX1 == 3 ~ "Probable vascular dementia", 
+                                      ADFDX1 == 4 ~ "Possible vascular dementia", 
+                                      ADFDX1 %in% c(10,13,15,18) ~ "Other dementia", ## dementia of undetermined etiology, frontal lobe dementia, alcoholic dementia, probable lewy body dementia
+                                      ADFDX1 %in% c(5,8,14,28,29) ~ "Other neurological", ## Parkinson's, normal pressure hydrocephalus, severe head trauma, stroke, other neurological conditions
+                                      ADFDX1 %in% c(20,21,22) ~ "MCI", ## mild-ambiguous, cognitive impairment secondary to vascular disease, MCI
+                                      ADFDX1 %in% c(23:25) ~ "Psychiatric", ## depression, psychiatric disorder, mental retardation
+                                      ADFDX1 %in% c(26,27,30,31) ~ "Normal"), ## alcohol abuse (past), alcohol abuse (current), other medical conditions, normal/non-case
+                diagnosis_3cat = case_when(diagnosis %in% c("Probable AD", "Probable vascular dementia", "Other dementia") ~ "Dementia",
+                                           diagnosis %in% c("Possible AD", "Possible vascular dementia", "MCI") ~ "MCI",
+                                           diagnosis %in% c("Normal", "Other neurological", "Psychiatric") ~ "Normal"), 
+                diagnosis = factor(diagnosis, levels = c("Probable AD", "Possible AD", "Probable vascular dementia", "Possible vascular dementia", "Other dementia", "Other neurological", "MCI", "Psychiatric", "Normal")), 
+                diagnosis_3cat = factor(diagnosis_3cat, levels = c("Dementia", "MCI", "Normal"))) %>%
+  dplyr::select(ADAMSSID, diagnosis, diagnosis_3cat)
+
+
+#### Demographics
+
+demographics <- ADAMS1TRK_R %>%
+  dplyr::filter(!AMONTH == 97) %>% ## exlcude those without Wave A assessment
+  dplyr::select(ADAMSSID, age = AAGE, GENDER, ETHNIC, edyrs = EDYRS, degree = DEGREE, weight = AASAMPWT_F) %>%
+  dplyr::mutate(age = na_if(age, 997), 
+                edyrs = na_if(edyrs, 99), 
+                female = as.numeric(GENDER == 2), 
+                race = factor(case_when(ETHNIC == 1 ~ "White",
+                                         ETHNIC == 2 ~ "Black",
+                                         ETHNIC == 3 ~ "Hispanic"), 
+                              levels = c("White", "Black", "Hispanic")), 
+                degree = factor(case_when(degree %in% 0:1 ~ "Less than high school or GED",
+                                          degree %in% 2:3 ~ "High school graduate", ## two-year degree in this category
+                                          degree == 4 ~ "College graduate",
+                                          degree %in% 5:6 ~ "Post-graduate"),
+                                levels = c("Less than high school or GED", "High school graduate", "College graduate", "Post-graduate"))) %>%
+  dplyr::select(ADAMSSID, age, female, race, edyrs, degree, weight) 
+
+
+  ## Self rated health 
+
+sr_health2000 <- RAND2000 %>%
+  dplyr::select(hhidpn, g1655) %>%
+  dplyr::mutate(poormem2000 = as.numeric(g1655 == 3)) %>%
+  dplyr::select(hhidpn, poormem2000)
+
+sr_health2002 <- RAND2002 %>%
+  dplyr::select(hhidpn, hd102) %>%
+  dplyr::mutate(poormem2002 = as.numeric(hd102 == 3)) %>%
+  dplyr::select(hhidpn, poormem2002)
+
+sr_health <- ADAMS1TRK_R %>%
+  dplyr::filter(!AMONTH == 97) %>%
+  dplyr::select(HHID, PN, ADAMSSID, WAVESEL) %>%
+  dplyr::mutate(hhidpn = as.numeric(paste0(HHID, PN))) %>%
+  left_join(sr_health2000, by = "hhidpn") %>%
+  left_join(sr_health2002, by = "hhidpn") %>%
+  dplyr::mutate(poormem = ifelse(WAVESEL == 1, poormem2000, poormem2002), 
+                poormem = coalesce(poormem, 0)) %>% ## assume no memory problems if missing
+  dplyr::select(ADAMSSID, poormem)
+
 # Stacking it up
 
-tidied <- vdori1 %>% 
-  left_join(vdmde1, by = "ADAMSSID") %>% 
-  left_join(vdmde2, by = "ADAMSSID") %>% 
-  left_join(vdmde3, by = "ADAMSSID") %>% 
-  left_join(vdmde4, by = "ADAMSSID") %>% 
-  left_join(vdmre1, by = "ADAMSSID") %>% 
-  left_join(vdmde6, by = "ADAMSSID") %>% 
-  left_join(vdexf2, by = "ADAMSSID") %>% 
-  left_join(vdexf8, by = "ADAMSSID") %>% 
-  left_join(vdexf9, by = "ADAMSSID") %>% 
-  left_join(vdasp1, by = "ADAMSSID") %>% 
-  left_join(vdasp2, by = "ADAMSSID") %>% 
-  left_join(vdasp3, by = "ADAMSSID") %>% 
-  left_join(vdlfl1, by = "ADAMSSID") %>% 
-  left_join(vdlfl2, by = "ADAMSSID") %>% 
-  left_join(vdlfl3, by = "ADAMSSID") %>% 
-  left_join(vdlfl4, by = "ADAMSSID") %>% 
-  left_join(vdlfl5, by = "ADAMSSID") %>% 
-  left_join(vdlfl7, by = "ADAMSSID") %>% 
-  left_join(vdlfl8, by = "ADAMSSID") %>% 
-  left_join(vdvis1, by = "ADAMSSID") %>% 
+join_list <- list(
+  vdori1, vdmde1, vdmde2, vdmde3, vdmde4, vdmre1, vdmde6, vdexf2, vdexf8, vdexf9,
+  vdasp1, vdasp2, vdasp3, vdlfl1, vdlfl2, vdlfl3, vdlfl4, vdlfl5, vdlfl7, vdlfl8,
+  vdvis1, iqcode, blessed, dementia, demographics, sr_health
+)
+
+tidied <- Reduce(function(x, y) left_join(x, y, by = "ADAMSSID"), join_list) %>%
   labelled::remove_labels()
 
 save.image(here::here(rds_filepath, "010_tidy-data.Rdata"))

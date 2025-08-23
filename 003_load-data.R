@@ -19,4 +19,12 @@ ADAMS1AG_R <- haven::read_sav(fs::path(data_filepath, "ADAMS1AG_R.sav"))
 
 ADAMS1AD_R <- haven::read_sav(fs::path(data_filepath, "ADAMS1AD_R.sav"))
 
+## rand 2000 for self-rated memory 
+
+RAND2000 <- haven::read_dta(fs::path(data_filepath, "h00f1d.dta"))
+
+## rand 2002 for self-rated memory 
+
+RAND2002 <- haven::read_dta(fs::path(data_filepath, "h02f2c.dta"))
+
 save.image(here::here(rds_filepath, "003_load-data.Rdata"))
