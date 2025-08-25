@@ -12,6 +12,7 @@ domain_scores <- c("ORI", "MEM", "EXF", "LFL", "VIS")
 
 data <- as.data.table(merge(tidied, fscores, by = "ADAMSSID"))
 
+## using Rich's knots for spline, could change to looking at ADAMS data separately 
 adjust_vars <- c("splines::ns(age, knots = c(78, 86, 94))", "female", "edyrs", "race")
 
 # FORMAT DATA ------------------------------------------------------------
@@ -50,7 +51,7 @@ setDT(data) ## tbh I'm not totally sure why this is needed, but it has to do wit
 data[, paste0(domain_scores, "_b_pred") := 
        lapply(1:length(domain_scores), function(x) predict(blom_models[[x]], newdata = data))]
 
-## add predicted blom scores to normative dataset
+## add predicted blom scores to normative dataset (Q: use true blom transformed or prediction, currently prediction)
 setDT(normative) ## tbh I'm not totally sure why this is needed, but it has to do with shallow copies, and it gets rid of a warning for below
 normative[, paste0(domain_scores, "_b_pred") := 
             lapply(1:length(domain_scores), function(x) predict(blom_models[[x]], newdata = normative))]
@@ -63,8 +64,7 @@ blom_sds <- as.numeric(normative[, lapply(.SD, sd, na.rm = TRUE), .SDcols = past
 ## add all two-way interactions to adjustment vars
 interaction_terms <- combn(adjust_vars, 2, FUN = function(x) paste0(x[1], ":", x[2]))
 
-## Rich does a whole thing where he makes regresison models to approximate the Blom transformation, so that this could 
-## be re-usable with any other dataset, but I don't think we need to do this for this project. 
+## normative models
 normative_design <- survey::svydesign(ids = ~1, weights = ~weight, data = normative)
 norms_models <- lapply(domain_scores, function(score){
     formula <- paste0(score, "_b_pred ~ ", paste(c(adjust_vars, interaction_terms), collapse = " + "))
@@ -128,3 +128,15 @@ data[, mci := as.numeric((num_impaired_domains >= 2 & severe_function == 0) |
 mean_design <- survey::svydesign(ids = ~1, weights = ~weight, data = data)
 dementia_prevalence <- survey::svyciprop(~dementia, design = mean_design)
 mci_prevalence <- survey::svyciprop(~mci, design = mean_design)
+
+## predicted three-cat 
+data[, predicted_3cat := factor(fcase(dementia == 1, "Dementia", 
+                                      mci == 1, "MCI", 
+                                      (!dementia == 1 & !mci == 1), "Normal"), 
+                                levels = c("Dementia", "MCI", "Normal"))]
+
+## let's look at things!  
+data[, table(predicted_3cat, diagnosis_3cat)]
+data[diagnosis_3cat == "Normal" & predicted_3cat == "Dementia", table(diagnosis)]
+data[, chisq.test(table(predicted_3cat, diagnosis_3cat))]
+data[, vcd::Kappa(table(predicted_3cat, diagnosis_3cat))]

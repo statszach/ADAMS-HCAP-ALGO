@@ -271,6 +271,7 @@ blessed <- ADAMS1AD_R %>%
 # psych::describe(hc16hp_i$INF1BL1_SCORE)
 
 #### Dementia diagnosis
+## could potentially look at ADAMS Wave C for confirmation diagnosis in those alive
 
 dementia <- ADAMS1AD_R %>%
   dplyr::select(ADAMSSID, ADFDX1) %>%
