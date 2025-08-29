@@ -37,6 +37,7 @@ normative[, paste0(domain_scores, "_b") := lapply(.SD, blom_transform), .SDcols 
 # MODELS TO GET BLOM SCORES IN FULL SAMPLE ----------------------------------
 
 ## is orientation handled differently in Rich's code? (https://github.com/rnj0nes/HCAP22/blob/main/Norms-with-weights-202109/-111-standardize-cognition-scores.do#L296)
+## ORIENTATION IS IMPAIRED IF YOU HAVE LESS THAN 8
 blom_design <- survey::svydesign(ids = ~1, weights = ~weight, data = normative)
 blom_models <- lapply(domain_scores, function(score){
     quantiles <- survey::svyquantile(as.formula(paste0("~", score)), design = blom_design, quantiles = c(0.05, 0.35, 0.65, 0.95))
@@ -105,6 +106,9 @@ data[diagnosis_3cat == "Normal",
 data[, paste0(domain_scores, "_impairment") := 
        lapply(1:length(domain_scores), function(x) ifelse(get(paste0(domain_scores[x], "_T_score")) < 36, 1, 0))]
 
+## override orientation impaimrent by using orientation less than 8 as the criteria
+data[, ORI_impairment := ifelse(ORI <= 8, 1, 0)]
+
 ## number of impaired domains 
 data[, num_impaired_domains := rowSums(.SD), .SDcols = paste0(domain_scores, "_impairment")]
 
@@ -134,9 +138,20 @@ data[, predicted_3cat := factor(fcase(dementia == 1, "Dementia",
                                       mci == 1, "MCI", 
                                       (!dementia == 1 & !mci == 1), "Normal"), 
                                 levels = c("Dementia", "MCI", "Normal"))]
+data[, predicted_2cat := factor(fcase(predicted_3cat == "Dementia", "Dementia", 
+                                      predicted_3cat %in% c("MCI", "Normal"), "No Dementia"))]
 
 ## let's look at things!  
 data[, table(predicted_3cat, diagnosis_3cat)]
+data[, table(predicted_2cat, diagnosis_2cat)]
 data[diagnosis_3cat == "Normal" & predicted_3cat == "Dementia", table(diagnosis)]
+data[diagnosis_3cat == "Normal" & predicted_3cat == "MCI", table(diagnosis)]
+data[diagnosis %in% c("Other neurological", "Psychiatric"), table(predicted_3cat)]
+
+## 3 cateogry version
 data[, chisq.test(table(predicted_3cat, diagnosis_3cat))]
 data[, vcd::Kappa(table(predicted_3cat, diagnosis_3cat))]
+
+## 2 category version
+data[, chisq.test(table(predicted_2cat, diagnosis_2cat))]
+data[, vcd::Kappa(table(predicted_2cat, diagnosis_2cat))]

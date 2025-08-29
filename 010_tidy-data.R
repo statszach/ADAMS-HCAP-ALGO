@@ -287,9 +287,11 @@ dementia <- ADAMS1AD_R %>%
                 diagnosis_3cat = case_when(diagnosis %in% c("Probable AD", "Probable vascular dementia", "Other dementia") ~ "Dementia",
                                            diagnosis %in% c("Possible AD", "Possible vascular dementia", "MCI") ~ "MCI",
                                            diagnosis %in% c("Normal", "Other neurological", "Psychiatric") ~ "Normal"), 
+                diagnosis_2cat = case_when(diagnosis_3cat == "Dementia" ~ "Dementia",
+                                           diagnosis_3cat %in% c("MCI", "Normal") ~ "Normal"),
                 diagnosis = factor(diagnosis, levels = c("Probable AD", "Possible AD", "Probable vascular dementia", "Possible vascular dementia", "Other dementia", "Other neurological", "MCI", "Psychiatric", "Normal")), 
                 diagnosis_3cat = factor(diagnosis_3cat, levels = c("Dementia", "MCI", "Normal"))) %>%
-  dplyr::select(ADAMSSID, diagnosis, diagnosis_3cat)
+  dplyr::select(ADAMSSID, diagnosis, diagnosis_3cat, diagnosis_2cat)
 
 
 #### Demographics
