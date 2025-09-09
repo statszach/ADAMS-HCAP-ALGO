@@ -2,6 +2,7 @@ library(tidyverse)
 library(data.table)
 library(gtsummary)
 library(MplusAutomation)
+library(patchwork)
 
 minmax <- function(x){
   
