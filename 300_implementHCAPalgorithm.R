@@ -141,17 +141,6 @@ data[, predicted_3cat := factor(fcase(dementia == 1, "Dementia",
 data[, predicted_2cat := factor(fcase(predicted_3cat == "Dementia", "Dementia", 
                                       predicted_3cat %in% c("MCI", "Normal"), "No Dementia"))]
 
-## let's look at things!  
-data[, table(predicted_3cat, diagnosis_3cat)]
-data[, table(predicted_2cat, diagnosis_2cat)]
-data[diagnosis_3cat == "Normal" & predicted_3cat == "Dementia", table(diagnosis)]
-data[diagnosis_3cat == "Normal" & predicted_3cat == "MCI", table(diagnosis)]
-data[diagnosis %in% c("Other neurological", "Psychiatric"), table(predicted_3cat)]
+readr::write_rds(data, here::here(paste0(rds_filepath, "hcapalgo.rds")))
+                                
 
-## 3 cateogry version
-data[, chisq.test(table(predicted_3cat, diagnosis_3cat))]
-data[, vcd::Kappa(table(predicted_3cat, diagnosis_3cat))]
-
-## 2 category version
-data[, chisq.test(table(predicted_2cat, diagnosis_2cat))]
-data[, vcd::Kappa(table(predicted_2cat, diagnosis_2cat))]
