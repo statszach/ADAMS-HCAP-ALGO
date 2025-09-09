@@ -252,9 +252,58 @@ iqcode <- ADAMS1AG_R %>%
 # clinician
 
 blessed <- ADAMS1AD_R %>% 
-  dplyr::select(ADAMSSID, ADBL1A, ADBL1B, ADBL1C,
-                ADBL1D, ADBL1E, ADBL1F, ADBL1G,
-                ADBL1H)  %>% 
+  
+
+# Define the item pairs
+letters_vec <- LETTERS[1:8]  # A through H
+items <- paste0("ADBL1", letters_vec)
+responses <- paste0("ADBL1", letters_vec, "R")
+
+# Generate blessed1 to blessed8
+blessed <- ADAMS1AD_R %>%
+  dplyr::select(ADAMSSID, ADBL1A:ADBL1HR) %>% 
+  dplyr::mutate(
+    across(
+      .cols = everything(),  # placeholder so mutate works
+      .fns = ~.,
+      .names = "{.col}"      # no-op, we add below
+    )
+  ) %>%
+  {
+    reduce2(
+      items, responses, .init = ., .f = function(d, itm, rsp) {
+        blessed_name <- paste0("blessed", substr(itm, 6, 6))
+        d %>%
+          mutate(
+            !!blessed_name := case_when(
+              !!sym(itm) == 0 ~ 0,
+              !!sym(itm) > 0 & !!sym(rsp) == 0 ~ 0,
+              !!sym(itm) > 0 & (!!sym(rsp) %in% c(1, 2)) ~ !!sym(itm),
+              !!sym(itm) == 97 ~ NA_real_
+            )
+          )
+      }
+    )
+  } %>% 
+  dplyr::mutate(blessed = blessedA + blessedB + blessedC + blessedD + blessedE + blessedF + blessedG + blessedH) %>% 
+  dplyr::select(ADAMSSID, blessed)
+
+
+
+
+
+
+
+
+
+
+%>%
+  dplyr::mutate(blessed1 = dplyr::case_when(ADBL1A == 0 ~ 0,
+                                            ADBL1A > 0 & ADBL1AR == 0 ~ 0,
+                                            ADBL1A > 0 & (ADBL1AR == 1 | ADBL1AR == 2) ~ ADBL1A,
+                                            ADBL1A == 97 ~ NA_real_))
+  
+  
   dplyr::mutate(across(contains("ADBL"), ~ replace(.x, .x %in% c(97), NA))) %>%
   dplyr::mutate(blessed_sum = rowSums(across(ADBL1A:ADBL1H), na.rm = TRUE)) %>% 
   dplyr::select(ADAMSSID, blessed_sum)
