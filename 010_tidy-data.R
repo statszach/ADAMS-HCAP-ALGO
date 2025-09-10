@@ -251,9 +251,6 @@ iqcode <- ADAMS1AG_R %>%
 
 # clinician
 
-blessed <- ADAMS1AD_R %>% 
-  
-
 # Define the item pairs
 letters_vec <- LETTERS[1:8]  # A through H
 items <- paste0("ADBL1", letters_vec)
@@ -289,35 +286,6 @@ blessed <- ADAMS1AD_R %>%
   dplyr::select(ADAMSSID, blessed)
 
 
-
-
-
-
-
-
-
-
-%>%
-  dplyr::mutate(blessed1 = dplyr::case_when(ADBL1A == 0 ~ 0,
-                                            ADBL1A > 0 & ADBL1AR == 0 ~ 0,
-                                            ADBL1A > 0 & (ADBL1AR == 1 | ADBL1AR == 2) ~ ADBL1A,
-                                            ADBL1A == 97 ~ NA_real_))
-  
-  
-  dplyr::mutate(across(contains("ADBL"), ~ replace(.x, .x %in% c(97), NA))) %>%
-  dplyr::mutate(blessed_sum = rowSums(across(ADBL1A:ADBL1H), na.rm = TRUE)) %>% 
-  dplyr::select(ADAMSSID, blessed_sum)
-
-## Check how to score blessed
-
-# checkblessedhcap <- hc16hp_i %>% 
-#   dplyr::select(INF1BL1_1, INF1BL1_2, INF1BL1_3, INF1BL1_4, INF1BL1_5,
-#                 INF1BL1_6, INF1BL1_7, INF1BL1_8) %>% 
-#   dplyr::mutate(across(contains("INF1"), ~ replace(.x, .x %in% c(8, 9), NA))) %>%
-#   dplyr::mutate(blessed_sum = rowSums(across(INF1BL1_1:INF1BL1_8), na.rm = TRUE)/3)
-  
-# psych::describe(checkblessedhcap$blessed_sum)
-# psych::describe(hc16hp_i$INF1BL1_SCORE)
 
 #### Dementia diagnosis
 ## could potentially look at ADAMS Wave C for confirmation diagnosis in those alive

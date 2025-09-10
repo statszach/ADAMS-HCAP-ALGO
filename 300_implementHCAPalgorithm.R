@@ -115,11 +115,11 @@ data[, num_impaired_domains := rowSums(.SD), .SDcols = paste0(domain_scores, "_i
 # OTHER ALGORITHM CUT-POINTS ---------------------------------------------------
 
 ## need imputation model for iqcode - just using this simple one for now - we should probably add predictors
-data <- simputation::impute_pmm(data, iqcode_mean ~ age + blessed_sum)
+data <- simputation::impute_pmm(data, iqcode_mean ~ age + blessed)
 
 ## define severe and moderate function loss according to cut points from Manly-Jones
-data[, severe_function := as.numeric(iqcode_mean >= 3.4 | blessed_sum >= 2)]
-data[, moderate_function := as.numeric(iqcode_mean > 3 | blessed_sum > 0)]
+data[, severe_function := as.numeric(iqcode_mean >= 3.4 | blessed >= 2)]
+data[, moderate_function := as.numeric(iqcode_mean > 3 | blessed > 0)]
 
 # DEFINE DEMENTIA AND MCI ------------------------------------------------------
 
@@ -143,4 +143,3 @@ data[, predicted_2cat := factor(fcase(predicted_3cat == "Dementia", "Dementia",
 
 readr::write_rds(data, here::here(paste0(rds_filepath, "hcapalgo.rds")))
                                 
-
