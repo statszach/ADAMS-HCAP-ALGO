@@ -6,6 +6,9 @@ source(here::here(paste0(code_filepath, "002_directories.R")))
 load(here::here(rds_filepath, "010_tidy-data.Rdata"))
 algo_data <- read_rds(paste0(rds_filepath, "hcapalgo.rds"))
 
+## date for version control of figures 
+date <- format(Sys.Date(), "%Y_%m_%d")
+
 ## relevel diagnoses so first level is normal 
 diag_vars <- c("diagnosis_3cat", "diagnosis_2cat", "predicted_3cat", "predicted_2cat")
 algo_data[, (diag_vars) := lapply(.SD, function(x) factor(x, levels = rev(levels(x)))), .SDcols = diag_vars]
@@ -35,7 +38,9 @@ make_contingency_plot <- function(algorithm_data, truth, algo){
         scale_x_discrete(position = "top") +
         guides(fill = "none") +
         labs(y = "Algorithm diagnosis", x = "Clinical diagnosis") +
-        theme_minimal()
+        theme_void() +
+        theme(axis.text = element_text(size = 12), axis.title = element_text(size = 14, face = "bold", margin = margin(b = 15)), 
+              axis.title.y = element_text(angle = 90, margin = margin(r = 15)))
 
     ## make text grob (add weighted if more than 2 categories)
     text_toinclude <- paste0("Unweighted Kappa = ", sprintf("%.2f", kappas$Unweighted[1]), 
@@ -50,8 +55,11 @@ make_contingency_plot <- function(algorithm_data, truth, algo){
     return(combined_plot)
 }
 
-plot_3cat <- make_contingency_plot(data = algo_data, truth = "diagnosis_3cat", algo = "predicted_3cat")
-plot_2cat <- make_contingency_plot(data = algo_data, truth = "diagnosis_2cat", algo = "predicted_2cat")
+plot_3cat <- make_contingency_plot(algorithm_data = algo_data, truth = "diagnosis_3cat", algo = "predicted_3cat")
+plot_2cat <- make_contingency_plot(algorithm_data = algo_data, truth = "diagnosis_2cat", algo = "predicted_2cat")
+
+ggsave(paste0(images_filepath, "contingency_3cat_", date, ".pdf"), plot_3cat, width = 10, height = 5)
+ggsave(paste0(images_filepath, "contingency_2cat_", date, ".pdf"), plot_2cat, width = 10, height = 5)
 
 # LOOK AT OFF DIAGONALS -----------------------------------------------------------
 
@@ -59,33 +67,46 @@ plot_2cat <- make_contingency_plot(data = algo_data, truth = "diagnosis_2cat", a
 disagreement_dt <- copy(algo_data[diagnosis_3cat != predicted_3cat, .(ADAMSSID, diagnosis_3cat, predicted_3cat, diagnosis, weight)])
 disagreement_dt[, disagreement_direction := ifelse((diagnosis_3cat == "Normal" & predicted_3cat %in% c("MCI", "Dementia") | 
                                                    (diagnosis_3cat == "MCI" & predicted_3cat == "Dementia")), "Algorithm more severe", "Clinical diagnosis more severe")]
-disagreement_dt[, disagreement := factor(paste0(diagnosis_3cat, " - ", predicted_3cat), 
-                                         levels = c("None", "Normal - Dementia", "Normal - MCI", "MCI - Dementia", "Dementia - MCI", "MCI - Normal", "Dementia - Normal"))]  
+disagreement_dt[, combo := factor(paste0(diagnosis_3cat, " - ", predicted_3cat), 
+                                         levels = c("Normal - Normal", "MCI - MCI", "Dementia - Dementia", 
+                                                    "Normal - Dementia", "Normal - MCI", "MCI - Dementia", "Dementia - MCI", "MCI - Normal", "Dementia - Normal"))]  
 disagreement_dt[, weight := scale(weight, center = FALSE, scale = sum(weight)/.N)] ## scale weights to sum to n
-disagreement_dt[, total_N_disagreement := sum(weight), by = disagreement] ## get denominators for each disagreement type
-disagreement_diagnosis_dt <- disagreement_dt[, .(prop_diagnosis = sum(weight)/unique(total_N_disagreement), 
-                                                 true_diagnosis = unique(diagnosis_3cat)), by = .(diagnosis, disagreement)]
+disagreement_dt[, total_N_combo := sum(weight), by = combo] ## get denominators for each combo
+disagreement_dt[, N_cat := paste0("N = ", .N), by = combo] ## get N for each combo
+disagreement_diagnosis_dt <- disagreement_dt[, .(prop_diagnosis = sum(weight)/unique(total_N_combo), 
+                                                 true_diagnosis = unique(diagnosis_3cat), 
+                                                 N_label = unique(N_cat)), by = .(diagnosis, combo)]
 
 ## get proportion in each diagnois by true diagnosis category (for fairness of comparison)
 agreement_dt <- copy(algo_data[diagnosis_3cat == predicted_3cat, .(ADAMSSID, diagnosis_3cat, predicted_3cat, diagnosis, weight)])
 agreement_dt[, weight := scale(weight, center = FALSE, scale = sum(weight)/.N)] ## scale weights to sum to n
-agreement_dt[, total_N_agreement := sum(weight), by = diagnosis_3cat] ## get denominators for each diagnosis type
+agreement_dt[, combo := factor(paste0(diagnosis_3cat, " - ", predicted_3cat), 
+                                   levels = c("Normal - Normal", "MCI - MCI", "Dementia - Dementia", 
+                                              "Normal - Dementia", "Normal - MCI", "MCI - Dementia", "Dementia - MCI", "MCI - Normal", "Dementia - Normal"))]
+agreement_dt[, total_N_agreement := sum(weight), by = combo] ## get denominators for each diagnosis type
+agreement_dt[, N_cat := paste0("N = ", .N), by = combo] ## get N for each combo
 agreement_diagnosis_dt <- agreement_dt[, .(prop_diagnosis = sum(weight)/unique(total_N_agreement), 
                                            true_diagnosis = unique(diagnosis_3cat),
-                                           disagreement = "None"), by = diagnosis]
+                                           combo = unique(combo), N_label = unique(N_cat)), by = diagnosis]
 
 ## put together
 full_diagnosis_dt <- rbind(disagreement_diagnosis_dt, agreement_diagnosis_dt)                                           
+full_diagnosis_dt[, diagnosis := factor(diagnosis, levels = rev(c("Normal", "Other neurological", "Psychiatric", 
+                                                              "MCI", "Possible AD", "Possible vascular dementia", 
+                                                              "Probable AD", "Probable vascular dementia", "Other dementia")))]
 
 ## plot
-disagreement_plot <- ggplot(full_diagnosis_dt, aes(x = diagnosis, y = prop_diagnosis, fill = disagreement)) + 
-    geom_bar(stat = "identity", position = "dodge") + 
-    facet_wrap(~true_diagnosis, ncol = 1) +
-    scale_fill_manual(values = c("black", "#2E598C", "#4b8ab1", "#9BD1F2", "#F7AF99", "#f5825f", "#f75e3b")) +
-    scale_x_discrete(labels = label_wrap(10)) +
-    labs(x = "Clinical diagnosis", y = "Proportion with diagnosis", fill = "Disagreement type \n(True - Algorithm)") +
+disagreement_plot <- ggplot(full_diagnosis_dt, aes(x = combo, y = prop_diagnosis, fill = diagnosis)) + 
+    geom_bar(stat = "identity", position = "stack") + 
+    geom_text(aes(label = N_label, y = 1.02)) +
+    facet_wrap(~true_diagnosis, nrow = 1, scales = "free_x") +
+    scale_fill_manual(values = c("#2E598C", "#4b8ab1", "#9BD1F2",  "#f75e3b", "#f5825f", "#F7AF99", "#2b5627", "#59a852", "#B4CF66"), 
+    breaks = rev(full_diagnosis_dt[, levels(diagnosis)])) +
+    scale_x_discrete(labels = label_wrap(12)) +
+    labs(x = "Classification \n(True - Algorithm)", y = "Proportion with diagnosis", fill = "Clinical diagnosis") +
     theme_bw()
 
+ggsave(paste0(images_filepath, "disagreement_diagnoses_", date, ".pdf"), disagreement_plot, width = 12, height = 6)
 
 # KAPPA BY OTHER CHARACTERISTICS --------------------------------------------------
 
@@ -96,8 +117,6 @@ algo_data[, educ := factor(fcase(degree == "Less than high school or GED", "Less
                                  degree == "High school graduate", "High school graduate",
                                  degree %in% c("College graduate", "Post-graduate"), "College and up"), 
                            levels = c("Less than high school or GED", "High school graduate", "College and up"))]
-
-algorithm_data <- copy(algo_data); truth = "diagnosis_2cat"; algo = "predicted_2cat"; cat = "age_group"
 
 get_kappa_bycat <- function(algorithm_data, truth, algo, cat){
 
@@ -139,6 +158,12 @@ kappas_3cat[, variable := factor(fcase(var == "age_group", "Age group",
                                   var == "gender", "Gender",
                                   var == "educ", "Education",
                                   var == "race", "Race"), 
-                            levels = c("Age group", "Gender", "Education", "Race"))]                                                        
+                            levels = c("Age group", "Gender", "Education", "Race"))]
+kappas_3cat[, category := factor(category, levels = c("70-79", "80-89", "90+", "Men", "Women", 
+                                                      "Less than high school or GED", "High school graduate", "College and up",
+                                                      "White", "Black", "Hispanic"))]
 kappas_3cat[, `:=` (value = paste0(sprintf("%.2f", mean), " (", sprintf("%.2f", lower), " to ", sprintf("%.2f", upper), ")"))]
 kappas_3cat <- dcast(kappas_3cat, variable + category ~ type, value.var = "value")
+kappas_3cat <- kappas_3cat[order(variable, category)]
+
+write.xlsx(kappas_3cat, paste0(images_filepath, "kappas_bychar_3cat_", date, ".xlsx"))
