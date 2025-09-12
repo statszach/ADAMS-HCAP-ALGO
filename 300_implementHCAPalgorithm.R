@@ -126,12 +126,30 @@ data[, moderate_function := as.numeric(iqcode_mean > 3 | blessed > 0)]
 data[, dementia := as.numeric(num_impaired_domains >= 2 & severe_function == 1)]
 data[, mci := as.numeric((num_impaired_domains >= 2 & severe_function == 0) |
                          (num_impaired_domains == 1 & moderate_function == 1) | 
-                         (num_impaired_domains == 1 & moderate_function == 0 | poormem == 1))]
+                         (num_impaired_domains == 1 & moderate_function == 0 & poormem == 1))]
+
+## numbers for figure
+message(paste0("Total N: ", nrow(data)))
+message(paste0("Impaired in 2+ domains: ", nrow(data[num_impaired_domains >= 2])))
+message(paste0("Impaired in 2+ domains + severe functional impairment: ", nrow(data[dementia == 1])))
+message(paste0("Impaired in 2+ domains + no severe functional impairment: ", nrow(data[num_impaired_domains >= 2 & severe_function == 0])))
+message(paste0("Not impaired in 2+ domains: ", nrow(data[num_impaired_domains < 2])))
+message(paste0("Impaired in 1 domain: ", nrow(data[num_impaired_domains == 1])))
+message(paste0("No cognitive impairment: ", nrow(data[num_impaired_domains == 0])))
+message(paste0("Impaired in 1 domain + moderate functional impairment: ", nrow(data[num_impaired_domains == 1 & moderate_function == 1])))
+message(paste0("Impaired in 1 domain + no moderate functional impairment: ", nrow(data[num_impaired_domains == 1 & moderate_function == 0])))
+message(paste0("Impaired in 1 domain + no moderate functional impairment + self-rated memory: ", nrow(data[num_impaired_domains == 1 & moderate_function == 0 & poormem == 1])))
+message(paste0("Impaired in 1 domain + no moderate functional impairment + no self-rated memory: ", nrow(data[num_impaired_domains == 1 & moderate_function == 0 & poormem == 0])))
+
 
 ## calculate prevalence of dementia and MCI
 mean_design <- survey::svydesign(ids = ~1, weights = ~weight, data = data)
 dementia_prevalence <- survey::svyciprop(~dementia, design = mean_design)
 mci_prevalence <- survey::svyciprop(~mci, design = mean_design)
+
+## prevalence of clinical dementia and MCI
+clinical_dementia_prevalence <- survey::svyciprop(~I(diagnosis_3cat == "Dementia"), design = mean_design)
+clinical_mci_prevalence <- survey::svyciprop(~I(diagnosis_3cat == "MCI"), design = mean_design)
 
 ## predicted three-cat 
 data[, predicted_3cat := factor(fcase(dementia == 1, "Dementia", 
