@@ -141,6 +141,16 @@ message(paste0("Impaired in 1 domain + no moderate functional impairment: ", nro
 message(paste0("Impaired in 1 domain + no moderate functional impairment + self-rated memory: ", nrow(data[num_impaired_domains == 1 & moderate_function == 0 & poormem == 1])))
 message(paste0("Impaired in 1 domain + no moderate functional impairment + no self-rated memory: ", nrow(data[num_impaired_domains == 1 & moderate_function == 0 & poormem == 0])))
 
+## numbers for percentage figure 
+message(paste0("Percentage impaired in less than 2 domains ", sprintf("%.2f%%", nrow(data[num_impaired_domains < 2]) / nrow(data) * 100)))
+message(paste0("Percentage impaired in more than 2 domains ", sprintf("%.2f%%", nrow(data[num_impaired_domains >= 2]) / nrow(data) * 100)))
+message(paste0("Percentage severe functional impairment ", sprintf("%.2f%%", nrow(data[num_impaired_domains >= 2 & severe_function == 1]) / nrow(data[num_impaired_domains >= 2]) * 100)))
+message(paste0("Percentage without severe functional impairment ", sprintf("%.2f%%", nrow(data[num_impaired_domains >= 2 & severe_function == 0]) / nrow(data[num_impaired_domains >= 2]) * 100)))
+message(paste0("Percentage impaired in 1 domain ", sprintf("%.2f%%", nrow(data[num_impaired_domains == 1]) / nrow(data[num_impaired_domains < 2]) * 100)))
+message(paste0("Percentage not impaired in 1 domain ", sprintf("%.2f%%", nrow(data[num_impaired_domains == 0]) / nrow(data[num_impaired_domains < 2]) * 100)))
+message(paste0("Percentage moderate functional impairment ", sprintf("%.2f%%", nrow(data[num_impaired_domains == 1 & moderate_function == 1]) / nrow(data[num_impaired_domains == 1]) * 100)))
+message(paste0("Percentage without moderate functional impairment ", sprintf("%.2f%%", nrow(data[num_impaired_domains == 1 & moderate_function == 0]) / nrow(data[num_impaired_domains == 1]) * 100)))
+message(paste0("Percentage self-rated poor memory ", sprintf("%.2f%%", nrow(data[num_impaired_domains == 1 & moderate_function == 0 & poormem == 1]) / nrow(data[num_impaired_domains == 1 & moderate_function == 0]) * 100)))
 
 ## calculate prevalence of dementia and MCI
 mean_design <- survey::svydesign(ids = ~1, weights = ~weight, data = data)

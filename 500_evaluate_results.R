@@ -167,3 +167,92 @@ kappas_3cat <- dcast(kappas_3cat, variable + category ~ type, value.var = "value
 kappas_3cat <- kappas_3cat[order(variable, category)]
 
 write.xlsx(kappas_3cat, paste0(images_filepath, "kappas_bychar_3cat_", date, ".xlsx"))
+
+# RISK RATIOS FOR UNDER/OVER DIAGNOSIS -------------------------------------------
+
+## get indicator variable 
+algo_data[, misclassified := as.numeric(diagnosis_3cat != predicted_3cat)]
+algo_data[, underdiagnosed := as.numeric((diagnosis_3cat == "Dementia" & predicted_3cat %in% c("MCI", "Normal")) | 
+                                         (diagnosis_3cat == "MCI" & predicted_3cat == "Normal"))]
+algo_data[, overdiagnosed := as.numeric((diagnosis_3cat == "Normal" & predicted_3cat %in% c("MCI", "Dementia")) | 
+                                        (diagnosis_3cat == "MCI" & predicted_3cat == "Dementia"))]
+
+## set normal to be the reference for diagnosis
+algo_data[, diagnosis := relevel(diagnosis, ref = "Normal")]
+
+## set up predictor variables 
+predictors <- c("age_group", "gender", "educ", "race")
+
+## survey design
+rr_design <- survey::svydesign(ids = ~1, weights = ~weight, data = algo_data)
+
+## function to get risk ratios
+get_riskratios <- function(predictor){
+
+    print(predictor)
+
+    ## misclassification risk ratios 
+    m_model <- survey::svyglm(as.formula(paste0("misclassified ~ ", predictor)), design = rr_design, family = poisson())
+    m_params <- parameters::parameters(m_model)
+    m_select <- grepl(predictor, m_params$Parameter)
+    m_params_dt <- data.table(cat = m_params$Parameter[m_select], rr = m_params$Coefficient[m_select], 
+                       rr_low = m_params$CI_low[m_select], rr_high = m_params$CI_high[m_select])
+    m_dt <- rbind(data.table(cat = paste0(predictor, algo_data[, levels(get(predictor))][1]), rr = 0, rr_low = NA, rr_high = NA), 
+                             m_params_dt)
+    m_dt[, `:=` (pred = predictor, type = "Total misclassification")]                             
+
+    ## underdiagnosis risk ratios 
+    u_model <- survey::svyglm(as.formula(paste0("underdiagnosed ~ ", predictor)), design = rr_design, family = poisson())
+    u_params <- parameters::parameters(u_model)
+    u_select <- grepl(predictor, u_params$Parameter)
+    u_params_dt <- data.table(cat = u_params$Parameter[u_select], rr = u_params$Coefficient[u_select], 
+                       rr_low = u_params$CI_low[u_select], rr_high = u_params$CI_high[u_select])
+    u_dt <- rbind(data.table(cat = paste0(predictor, algo_data[, levels(get(predictor))][1]), rr = 0, rr_low = NA, rr_high = NA), 
+                             u_params_dt)
+    u_dt[, `:=` (pred = predictor, type = "Algorithm < Clinical")]                          
+
+    ## overdiagnosis risk ratios 
+    o_model <- survey::svyglm(as.formula(paste0("overdiagnosed ~ ", predictor)), design = rr_design, family = poisson())
+    o_params <- parameters::parameters(o_model)
+    o_select <- grepl(predictor, o_params$Parameter)
+    o_params_dt <- data.table(cat = o_params$Parameter[o_select], rr = o_params$Coefficient[o_select], 
+                       rr_low = o_params$CI_low[o_select], rr_high = o_params$CI_high[o_select])
+    o_dt <- rbind(data.table(cat = paste0(predictor, algo_data[, levels(get(predictor))][1]), rr = 0, rr_low = NA, rr_high = NA), 
+                             o_params_dt)
+    o_dt[, `:=` (pred = predictor, type = "Algorithm > Clinical")]                           
+
+    ## combine together 
+    results <- rbindlist(list(m_dt, u_dt, o_dt))
+
+    return(results)
+}
+
+rr_results <- rbindlist(lapply(predictors, get_riskratios))
+
+## create necessary factors with correct order for plotting
+rr_plot_dt <- copy(rr_results)
+rr_plot_dt[, cat_label := cat][, cat_label := gsub("age_group", "Age Group: ", cat_label)][, cat_label := gsub("gender", "Gender: ", cat_label)] 
+rr_plot_dt[, cat_label := gsub("educ", "Education: ", cat_label)][, cat_label := gsub("race", "Race/ethnicity: ", cat_label)]
+rr_plot_dt[, cat_label := factor(cat_label, levels = rr_plot_dt[, rev(unique(cat_label))])]
+rr_plot_dt[, type := factor(type, levels = c("Total misclassification", "Algorithm < Clinical", "Algorithm > Clinical"))]
+
+## create spacers for discrete axis 
+cats <- unique(str_extract(rr_plot_dt[, levels(cat_label)], ".*?(?=:)"))
+discrete_lims <- unlist(lapply(1:length(cats), function(x) c(str_subset(rr_plot_dt[, levels(cat_label)], cats[x]), "skip")))
+discrete_lims <- discrete_lims[-length(discrete_lims)] ## remove the last skip
+
+## plot results
+plot_breaks <- c(0.4,0.6,0.8,1,2,3,4); log_breaks <- log(plot_breaks)
+rr_plot <- ggplot(rr_plot_dt, aes(x = cat_label, y = rr, ymin = rr_low, ymax = rr_high)) +
+    geom_point(color = "#2d6a2d") +
+    geom_errorbar(width = 0, color = "#2d6a2d") + 
+    geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
+    facet_wrap(~type, nrow = 1) +
+    labs(x = "", y = "Relative risk") + 
+    scale_x_discrete(breaks = rr_plot_dt[, levels(cat_label)], limits = discrete_lims) +
+    scale_y_continuous(breaks = log_breaks, labels = plot_breaks, limits = c(log(0.3), log(6)), oob = scales::oob_keep) +
+    coord_flip() +
+    theme_bw()
+
+ggsave(paste0(images_filepath, "rr_disagreement_", date, ".pdf"), rr_plot, width = 12, height = 6)
+
