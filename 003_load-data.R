@@ -27,4 +27,8 @@ RAND2000 <- haven::read_dta(fs::path(data_filepath, "h00f1d.dta"))
 
 RAND2002 <- haven::read_dta(fs::path(data_filepath, "h02f2c.dta"))
 
+## harmonized hrs for adls/iadls
+
+GATEWAY <- haven::read_dta(fs::path(data_filepath, "H_HRS_d.dta"))
+
 save.image(here::here(rds_filepath, "003_load-data.Rdata"))

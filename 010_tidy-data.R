@@ -354,15 +354,32 @@ sr_health <- ADAMS1TRK_R %>%
                 poormem = coalesce(poormem, 0)) %>% ## assume no memory problems if missing
   dplyr::select(ADAMSSID, poormem)
 
+## adls and iadls
+
+disability_core <- GATEWAY %>%
+  dplyr::select(hhidpn, r5adlfive, r6adlfive, r5iadlfour, r6iadlfour) %>%
+  dplyr::rename(adl2000 = r5adlfive, adl2002 = r6adlfive, iadl2000 = r5iadlfour, iadl2002 = r6iadlfour)
+
+disability <- ADAMS1TRK_R %>%
+  dplyr::filter(!AMONTH == 97) %>%
+  dplyr::select(HHID, PN, ADAMSSID, WAVESEL) %>%
+  dplyr::mutate(hhidpn = as.numeric(paste0(HHID, PN))) %>%
+  left_join(disability_core, by = "hhidpn") %>%
+  dplyr::mutate(adl = ifelse(WAVESEL == 1, adl2000, adl2002), 
+                iadl = ifelse(WAVESEL == 1, iadl2000, iadl2002)) %>%
+  dplyr::mutate(iadl = ifelse(hhidpn == "203309010", iadl2000, iadl)) %>% ## deal with one person with missing iadl (due to don't do) and assign them to the wave earlier               
+  dplyr::select(ADAMSSID, adl, iadl)
+
+
 # Stacking it up
 
 join_list <- list(
   vdori1, vdmde1, vdmde2, vdmde3, vdmde4, vdmre1, vdmde6, vdexf2, vdexf8, vdexf9,
   vdasp1, vdasp2, vdasp3, vdlfl1, vdlfl2, vdlfl3, vdlfl4, vdlfl5, vdlfl7, vdlfl8,
-  vdvis1, iqcode, blessed, dementia, demographics, sr_health
+  vdvis1, iqcode, blessed, dementia, demographics, sr_health, disability
 )
 
 tidied <- Reduce(function(x, y) left_join(x, y, by = "ADAMSSID"), join_list) %>%
   labelled::remove_labels()
 
-save.image(here::here(rds_filepath, "010_tidy-data.Rdata"))
+readr::write_rds(tidied, here::here(rds_filepath, "010_tidy-data.rds"))

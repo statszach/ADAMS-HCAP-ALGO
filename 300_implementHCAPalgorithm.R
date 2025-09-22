@@ -3,8 +3,8 @@ user <- "Emma"; code_filepath <- "C:\\Users\\emmanich\\code\\ADAMS-HCAP-ALGO\\"
 source(here::here(paste0(code_filepath, "001_libraries.R")))
 source(here::here(paste0(code_filepath, "002_directories.R")))
 
-load(here::here(rds_filepath, "010_tidy-data.Rdata"))
-fscores <- read_rds(paste0(rds_filepath, "fscores.rds"))
+tidied <- readr::read_rds(here::here(rds_filepath, "010_tidy-data.rds"))
+fscores <- readr::read_rds(paste0(rds_filepath, "fscores.rds"))
 
 domain_scores <- c("ORI", "MEM", "EXF", "LFL", "VIS")
 
@@ -114,14 +114,18 @@ data[, num_impaired_domains := rowSums(.SD), .SDcols = paste0(domain_scores, "_i
 
 # OTHER ALGORITHM CUT-POINTS ---------------------------------------------------
 
-## need imputation model for iqcode - just using this simple one for now - we should probably add predictors
-data <- simputation::impute_pmm(data, iqcode_mean ~ age + blessed)
+## need imputation model for iqcode - just using this simple one for now
+data <- simputation::impute_pmm(data, blessed ~ age + adl + iadl)
+data <- simputation::impute_pmm(data, iqcode_mean ~ age + blessed + adl + iadl)
 
 ## define severe and moderate function loss according to cut points from Manly-Jones
 data[, severe_function := as.numeric(iqcode_mean >= 3.4 | blessed >= 2)]
 data[, moderate_function := as.numeric(iqcode_mean > 3 | blessed > 0)]
 
 # DEFINE DEMENTIA AND MCI ------------------------------------------------------
+
+## make sure that there is no missingness in any important predictors
+if (nrow(data[is.na(num_impaired_domains) | is.na(severe_function) | is.na(moderate_function)]) > 0) stop("There is missingness in classification, check contributing variables")
 
 data[, dementia := as.numeric(num_impaired_domains >= 2 & severe_function == 1)]
 data[, mci := as.numeric((num_impaired_domains >= 2 & severe_function == 0) |
@@ -142,15 +146,17 @@ message(paste0("Impaired in 1 domain + no moderate functional impairment + self-
 message(paste0("Impaired in 1 domain + no moderate functional impairment + no self-rated memory: ", nrow(data[num_impaired_domains == 1 & moderate_function == 0 & poormem == 0])))
 
 ## numbers for percentage figure 
-message(paste0("Percentage impaired in less than 2 domains ", sprintf("%.2f%%", nrow(data[num_impaired_domains < 2]) / nrow(data) * 100)))
-message(paste0("Percentage impaired in more than 2 domains ", sprintf("%.2f%%", nrow(data[num_impaired_domains >= 2]) / nrow(data) * 100)))
-message(paste0("Percentage severe functional impairment ", sprintf("%.2f%%", nrow(data[num_impaired_domains >= 2 & severe_function == 1]) / nrow(data[num_impaired_domains >= 2]) * 100)))
-message(paste0("Percentage without severe functional impairment ", sprintf("%.2f%%", nrow(data[num_impaired_domains >= 2 & severe_function == 0]) / nrow(data[num_impaired_domains >= 2]) * 100)))
-message(paste0("Percentage impaired in 1 domain ", sprintf("%.2f%%", nrow(data[num_impaired_domains == 1]) / nrow(data[num_impaired_domains < 2]) * 100)))
-message(paste0("Percentage not impaired in 1 domain ", sprintf("%.2f%%", nrow(data[num_impaired_domains == 0]) / nrow(data[num_impaired_domains < 2]) * 100)))
-message(paste0("Percentage moderate functional impairment ", sprintf("%.2f%%", nrow(data[num_impaired_domains == 1 & moderate_function == 1]) / nrow(data[num_impaired_domains == 1]) * 100)))
-message(paste0("Percentage without moderate functional impairment ", sprintf("%.2f%%", nrow(data[num_impaired_domains == 1 & moderate_function == 0]) / nrow(data[num_impaired_domains == 1]) * 100)))
-message(paste0("Percentage self-rated poor memory ", sprintf("%.2f%%", nrow(data[num_impaired_domains == 1 & moderate_function == 0 & poormem == 1]) / nrow(data[num_impaired_domains == 1 & moderate_function == 0]) * 100)))
+message(paste0("Percentage impaired in less than 2 domains ", sprintf("%.1f%%", (data[num_impaired_domains < 2, sum(weight)]) / data[, sum(weight)] * 100)))
+message(paste0("Percentage impaired in more than 2 domains ", sprintf("%.1f%%", (data[num_impaired_domains >= 2, sum(weight)]) / data[, sum(weight)] * 100)))
+message(paste0("Percentage severe functional impairment ", sprintf("%.1f%%", (data[num_impaired_domains >= 2 & severe_function == 1, sum(weight)]) / (data[num_impaired_domains >= 2, sum(weight)]) * 100)))
+message(paste0("Percentage without severe functional impairment ", sprintf("%.1f%%", (data[num_impaired_domains >= 2 & severe_function == 0, sum(weight)]) / (data[num_impaired_domains >= 2, sum(weight)]) * 100)))
+message(paste0("Percentage impaired in 1 domain ", sprintf("%.1f%%", (data[num_impaired_domains == 1, sum(weight)]) / (data[num_impaired_domains < 2, sum(weight)]) * 100)))
+message(paste0("Percentage not impaired in 1 domain ", sprintf("%.1f%%", (data[num_impaired_domains == 0, sum(weight)]) / (data[num_impaired_domains < 2, sum(weight)]) * 100)))
+message(paste0("Percentage moderate functional impairment ", sprintf("%.1f%%", (data[num_impaired_domains == 1 & moderate_function == 1, sum(weight)]) / (data[num_impaired_domains == 1, sum(weight)]) * 100)))
+message(paste0("Percentage without moderate functional impairment ", sprintf("%.1f%%", (data[num_impaired_domains == 1 & moderate_function == 0, sum(weight)]) / (data[num_impaired_domains == 1, sum(weight)]) * 100)))
+message(paste0("Percentage self-rated poor memory ", sprintf("%.1f%%", (data[num_impaired_domains == 1 & moderate_function == 0 & poormem == 1, sum(weight)]) / (data[num_impaired_domains == 1 & moderate_function == 0, sum(weight)]) * 100)))
+message(paste0("Percentage no self-rated poor memory ", sprintf("%.1f%%", (data[num_impaired_domains == 1 & moderate_function == 0 & poormem == 0, sum(weight)]) / (data[num_impaired_domains == 1 & moderate_function == 0, sum(weight)]) * 100)))
+
 
 ## calculate prevalence of dementia and MCI
 mean_design <- survey::svydesign(ids = ~1, weights = ~weight, data = data)
