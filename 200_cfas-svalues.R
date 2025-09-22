@@ -3,7 +3,7 @@ user <- "Emma"; code_filepath <- "C:\\Users\\emmanich\\code\\ADAMS-HCAP-ALGO\\"
 source(here::here(paste0(code_filepath, "001_libraries.R")))
 source(here::here(paste0(code_filepath, "002_directories.R")))
 
-load(here::here(rds_filepath, "010_tidy-data.Rdata"))
+tidied <- readr::read_rds(here::here(rds_filepath, "010_tidy-data.rds"))
 
 #### Memory
 

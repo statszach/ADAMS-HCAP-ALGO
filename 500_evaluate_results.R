@@ -3,7 +3,7 @@ user <- "Emma"; code_filepath <- "C:\\Users\\emmanich\\code\\ADAMS-HCAP-ALGO\\"
 source(here::here(paste0(code_filepath, "001_libraries.R")))
 source(here::here(paste0(code_filepath, "002_directories.R")))
 
-load(here::here(rds_filepath, "010_tidy-data.Rdata"))
+tidied <- readr::read_rds(here::here(rds_filepath, "010_tidy-data.rds"))
 algo_data <- read_rds(paste0(rds_filepath, "hcapalgo.rds"))
 
 ## date for version control of figures 
@@ -68,8 +68,9 @@ disagreement_dt <- copy(algo_data[diagnosis_3cat != predicted_3cat, .(ADAMSSID, 
 disagreement_dt[, disagreement_direction := ifelse((diagnosis_3cat == "Normal" & predicted_3cat %in% c("MCI", "Dementia") | 
                                                    (diagnosis_3cat == "MCI" & predicted_3cat == "Dementia")), "Algorithm more severe", "Clinical diagnosis more severe")]
 disagreement_dt[, combo := factor(paste0(diagnosis_3cat, " - ", predicted_3cat), 
-                                         levels = c("Normal - Normal", "MCI - MCI", "Dementia - Dementia", 
-                                                    "Normal - Dementia", "Normal - MCI", "MCI - Dementia", "Dementia - MCI", "MCI - Normal", "Dementia - Normal"))]  
+                                         levels = c("Normal - Normal", "Normal - MCI", "Normal - Dementia", 
+                                                    "MCI - Normal", "MCI - MCI", "MCI - Dementia", 
+                                                    "Dementia - Normal", "Dementia - MCI", "Dementia - Dementia"))]  
 disagreement_dt[, weight := scale(weight, center = FALSE, scale = sum(weight)/.N)] ## scale weights to sum to n
 disagreement_dt[, total_N_combo := sum(weight), by = combo] ## get denominators for each combo
 disagreement_dt[, N_cat := paste0("N = ", .N), by = combo] ## get N for each combo
@@ -81,8 +82,9 @@ disagreement_diagnosis_dt <- disagreement_dt[, .(prop_diagnosis = sum(weight)/un
 agreement_dt <- copy(algo_data[diagnosis_3cat == predicted_3cat, .(ADAMSSID, diagnosis_3cat, predicted_3cat, diagnosis, weight)])
 agreement_dt[, weight := scale(weight, center = FALSE, scale = sum(weight)/.N)] ## scale weights to sum to n
 agreement_dt[, combo := factor(paste0(diagnosis_3cat, " - ", predicted_3cat), 
-                                   levels = c("Normal - Normal", "MCI - MCI", "Dementia - Dementia", 
-                                              "Normal - Dementia", "Normal - MCI", "MCI - Dementia", "Dementia - MCI", "MCI - Normal", "Dementia - Normal"))]
+                                   levels = c("Normal - Normal", "Normal - MCI", "Normal - Dementia", 
+                                                    "MCI - Normal", "MCI - MCI", "MCI - Dementia", 
+                                                    "Dementia - Normal", "Dementia - MCI", "Dementia - Dementia"))]
 agreement_dt[, total_N_agreement := sum(weight), by = combo] ## get denominators for each diagnosis type
 agreement_dt[, N_cat := paste0("N = ", .N), by = combo] ## get N for each combo
 agreement_diagnosis_dt <- agreement_dt[, .(prop_diagnosis = sum(weight)/unique(total_N_agreement), 
@@ -102,8 +104,8 @@ disagreement_plot <- ggplot(full_diagnosis_dt, aes(x = combo, y = prop_diagnosis
     facet_wrap(~true_diagnosis, nrow = 1, scales = "free_x") +
     scale_fill_manual(values = c("#2E598C", "#4b8ab1", "#9BD1F2",  "#f75e3b", "#f5825f", "#F7AF99", "#2b5627", "#59a852", "#B4CF66"), 
     breaks = rev(full_diagnosis_dt[, levels(diagnosis)])) +
-    scale_x_discrete(labels = label_wrap(12)) +
-    labs(x = "Classification \n(True - Algorithm)", y = "Proportion with diagnosis", fill = "Clinical diagnosis") +
+    scale_x_discrete(labels = scales::label_wrap(12)) +
+    labs(x = "Classification \n(Clinical - Algorithm)", y = "Proportion with diagnosis", fill = "Clinical diagnosis") +
     theme_bw()
 
 ggsave(paste0(images_filepath, "disagreement_diagnoses_", date, ".pdf"), disagreement_plot, width = 12, height = 6)
@@ -166,7 +168,7 @@ kappas_3cat[, `:=` (value = paste0(sprintf("%.2f", mean), " (", sprintf("%.2f", 
 kappas_3cat <- dcast(kappas_3cat, variable + category ~ type, value.var = "value")
 kappas_3cat <- kappas_3cat[order(variable, category)]
 
-write.xlsx(kappas_3cat, paste0(images_filepath, "kappas_bychar_3cat_", date, ".xlsx"))
+openxlsx::write.xlsx(kappas_3cat, paste0(images_filepath, "kappas_bychar_3cat_", date, ".xlsx"))
 
 # RISK RATIOS FOR UNDER/OVER DIAGNOSIS -------------------------------------------
 
