@@ -10,7 +10,7 @@ algo_data <- read_rds(paste0(rds_filepath, "hcapalgo.rds"))
 date <- format(Sys.Date(), "%Y_%m_%d")
 
 ## relevel diagnoses so first level is normal 
-diag_vars <- c("diagnosis_3cat", "diagnosis_2cat", "predicted_3cat", "predicted_2cat")
+diag_vars <- c("diagnosis_3cat", "diagnosis_2cat", "predicted_3cat", "predicted_2cat", "predicted_2cat_s1", "predicted_3cat_s1")
 algo_data[, (diag_vars) := lapply(.SD, function(x) factor(x, levels = rev(levels(x)))), .SDcols = diag_vars]
 
 # MAKE CONTINGENCY TABLES --------------------------------------------------
@@ -58,8 +58,13 @@ make_contingency_plot <- function(algorithm_data, truth, algo){
 plot_3cat <- make_contingency_plot(algorithm_data = algo_data, truth = "diagnosis_3cat", algo = "predicted_3cat")
 plot_2cat <- make_contingency_plot(algorithm_data = algo_data, truth = "diagnosis_2cat", algo = "predicted_2cat")
 
+plot_3cat_s1 <- make_contingency_plot(algorithm_data = algo_data, truth = "diagnosis_3cat", algo = "predicted_3cat_s1")
+plot_2cat_s1 <- make_contingency_plot(algorithm_data = algo_data, truth = "diagnosis_2cat", algo = "predicted_2cat_s1")
+
 ggsave(paste0(images_filepath, "contingency_3cat_", date, ".pdf"), plot_3cat, width = 10, height = 5)
 ggsave(paste0(images_filepath, "contingency_2cat_", date, ".pdf"), plot_2cat, width = 10, height = 5)
+ggsave(paste0(images_filepath, "contingency_3cat_s1_", date, ".pdf"), plot_3cat_s1, width = 10, height = 5)
+ggsave(paste0(images_filepath, "contingency_2cat_s1_", date, ".pdf"), plot_2cat_s1, width = 10, height = 5)
 
 # LOOK AT OFF DIAGONALS -----------------------------------------------------------
 
