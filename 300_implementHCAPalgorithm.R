@@ -71,12 +71,20 @@ classify <- function(all_data = data, normative_data){
     ## add all two-way interactions to adjustment vars
     interaction_terms <- combn(adjust_vars, 2, FUN = function(x) paste0(x[1], ":", x[2]))
 
+    ## special case no age/gender interaction or age/race interaction when excluding iadls
+    if (normative_dt[, length(unique(iadl))] == 1) interaction_terms <- interaction_terms[!interaction_terms %in% c("splines::ns(age, knots = c(78, 86, 94)):female",
+                                                                                                            "splines::ns(age, knots = c(78, 86, 94)):race")]
+
     ## normative models
     normative_design <- survey::svydesign(ids = ~1, weights = ~weight, data = normative_dt)
     norms_models <- lapply(domain_scores, function(score){
         formula <- paste0(score, "_b_pred ~ ", paste(c(adjust_vars, interaction_terms), collapse = " + "))
         return(survey::svyglm(formula, design = normative_design))
     })
+
+    ## warning for problematic interaction terms  
+    largecoefs <- lapply(norms_models, function(x) any(tidy(x)$estimate > 10)) ## any coefficient over ten
+    if (any(unlist(largecoefs))) warning(paste0("Large coefficient detected in normative model: ", paste0(domain_scores[unlist(largecoefs)], collapse = ", ")))
 
     ## get model r2s 
     norms_r2 <- sapply(norms_models, function(x) 1 - (x$deviance / x$null.deviance))
@@ -96,8 +104,9 @@ classify <- function(all_data = data, normative_data){
     check_tscore <- dt[ADAMSSID %in% normative_dt[, ADAMSSID], 
                             lapply(.SD, function(x) c(mean = mean(x, na.rm = TRUE), sd = sd(x, na.rm = TRUE))), 
                             .SDcols = paste0(domain_scores, "_T_score")]
-    if (any(sapply(check_tscore[1,], function(x) abs(x-50) >= 4)) | any(sapply(check_tscore[2,], function(x) abs(x-10) >= 2))) {
-        warning("T-score mean and/or sd not equal to 50 and/or 10 in Reference Sample"); print(check_tscore)
+    print(check_tscore)                   
+    if (any(sapply(check_tscore[1,], function(x) abs(x-50) >= 4)) | any(sapply(check_tscore[2,], function(x) abs(x-10) >= 2.5))) {
+        warning("T-score mean and/or sd not equal to 50 and/or 10 in Reference Sample")
     }
 
     ## define impairment as lower than 36 for each domain 
@@ -131,6 +140,8 @@ classify <- function(all_data = data, normative_data){
 
 class_dt1 <- classify(all_data = data, normative_data = data[diagnosis_3cat == "Normal"])
 class_dt2 <- classify(all_data = data, normative_data = data[diagnosis_3cat == "Normal" & stroke == 0])
+class_dt3 <- classify(all_data = data, normative_data = data[diagnosis_3cat == "Normal" & iadl == 0])
+class_dt4 <- classify(all_data = data, normative_data = data[diagnosis_3cat == "Normal" & iadl == 0 & stroke == 0])
 
 # PRINT RESULTS -----------------------------------------------------------
 
@@ -171,6 +182,8 @@ print_results <- function(data){
 
 print_results(class_dt1)
 print_results(class_dt2)
+print_results(class_dt3)
+print_results(class_dt4)
 
 # MAKE COMPARISONS -----------------------------------------------------------
 
@@ -184,8 +197,10 @@ ADAMSorig_cind_prevalence <- survey::svyciprop(~I(diagnosis_3cat_ADAMS == "CIND"
 
 # SAVE RESULTS -----------------------------------------------------------------
 
-final_data <- copy(class_dt2)
-final_data <- merge(final_data, class_dt1[, .(ADAMSSID, predicted_3cat_s1 = predicted_3cat, predicted_2cat_s1 = predicted_2cat)], by = "ADAMSSID")
+final_data <- copy(class_dt1)
+final_data <- merge(final_data, class_dt2[, .(ADAMSSID, predicted_3cat_s1 = predicted_3cat, predicted_2cat_s1 = predicted_2cat)], by = "ADAMSSID")
+final_data <- merge(final_data, class_dt3[, .(ADAMSSID, predicted_3cat_s2 = predicted_3cat, predicted_2cat_s2 = predicted_2cat)], by = "ADAMSSID")
+final_data <- merge(final_data, class_dt4[, .(ADAMSSID, predicted_3cat_s3 = predicted_3cat, predicted_2cat_s3 = predicted_2cat)], by = "ADAMSSID")
 
 readr::write_rds(final_data, here::here(paste0(rds_filepath, "hcapalgo.rds")))
 
