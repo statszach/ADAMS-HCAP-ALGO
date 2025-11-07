@@ -1,5 +1,10 @@
 rm(list = setdiff(ls(), lsf.str())[!(setdiff(ls(), lsf.str()) %in% "params")])
-user <- "Emma"; code_filepath <- "C:\\Users\\emmanich\\code\\ADAMS-HCAP-ALGO\\"
+user <- "Emma"
+if (Sys.info()["sysname"] == "Windows") {
+    code_filepath <- "C:\\Users\\emmanich\\code\\ADAMS-HCAP-ALGO\\"
+} else {
+    code_filepath <- "/Users/emmanich/code/ADAMS-HCAP-ALGO/"
+}
 source(here::here(paste0(code_filepath, "001_libraries.R")))
 source(here::here(paste0(code_filepath, "002_directories.R")))
 

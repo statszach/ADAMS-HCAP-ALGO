@@ -1,5 +1,10 @@
 rm(list = setdiff(ls(), lsf.str())[!(setdiff(ls(), lsf.str()) %in% "params")])
-user <- "Emma"; code_filepath <- "C:\\Users\\emmanich\\code\\ADAMS-HCAP-ALGO\\"
+user <- "Emma"
+if (Sys.info()["sysname"] == "Windows") {
+    code_filepath <- "C:\\Users\\emmanich\\code\\ADAMS-HCAP-ALGO\\"
+} else {
+    code_filepath <- "/Users/emmanich/code/ADAMS-HCAP-ALGO/"
+}
 source(here::here(paste0(code_filepath, "001_libraries.R")))
 source(here::here(paste0(code_filepath, "002_directories.R")))
 
@@ -285,37 +290,89 @@ blessed <- ADAMS1AD_R %>%
   dplyr::mutate(blessed = blessedA + blessedB + blessedC + blessedD + blessedE + blessedF + blessedG + blessedH) %>% 
   dplyr::select(ADAMSSID, blessed)
 
-
+## mortality at other ADAMS waves 
+mortality <- ADAMS1TRK_R %>%
+  dplyr::filter(!AMONTH == 97) %>%
+  dplyr::select(ADAMSSID, BFRESULT, CVITSTAT) %>%
+  dplyr::mutate(dead_b = as.numeric(BFRESULT == 7), dead_c = as.numeric(CVITSTAT == 5)) %>%
+  dplyr::select(ADAMSSID, dead_b, dead_c)
 
 #### Dementia diagnosis
 ## could potentially look at ADAMS Wave C for confirmation diagnosis in those alive
 
 dementia <- ADAMS1AD_R %>%
   dplyr::select(ADAMSSID, ADFDX1) %>%
-  dplyr::mutate(diagnosis = case_when(ADFDX1 == 1 ~ "Probable AD", 
-                                      ADFDX1 == 2 ~ "Possible AD", 
-                                      ADFDX1 == 3 ~ "Probable vascular dementia", 
-                                      ADFDX1 == 4 ~ "Possible vascular dementia", 
-                                      ADFDX1 %in% c(10,13,15,18) ~ "Other dementia", ## dementia of undetermined etiology, frontal lobe dementia, alcoholic dementia, probable lewy body dementia
-                                      ADFDX1 %in% c(5,8,14,28,29) ~ "Other neurological", ## Parkinson's, normal pressure hydrocephalus, severe head trauma, stroke, other neurological conditions
-                                      ADFDX1 %in% c(20,21,22) ~ "MCI", ## mild-ambiguous, cognitive impairment secondary to vascular disease, MCI
-                                      ADFDX1 %in% c(23:25) ~ "Psychiatric", ## depression, psychiatric disorder, mental retardation
-                                      ADFDX1 %in% c(26,27,30,31) ~ "Normal"), ## alcohol abuse (past), alcohol abuse (current), other medical conditions, normal/non-case
-                diagnosis_3cat = case_when(diagnosis %in% c("Probable AD", "Probable vascular dementia", "Other dementia") ~ "Dementia",
-                                           diagnosis %in% c("Possible AD", "Possible vascular dementia", "MCI") ~ "MCI",
-                                           diagnosis %in% c("Normal", "Other neurological", "Psychiatric") ~ "Normal"), 
-                diagnosis_2cat = case_when(diagnosis_3cat == "Dementia" ~ "Dementia",
-                                           diagnosis_3cat %in% c("MCI", "Normal") ~ "No Dementia"),
+  dplyr::mutate(diagnosis = case_when(ADFDX1 %in% 1:2 ~ "Alzheimer's disease", ## probable and possible AD
+                                      ADFDX1 %in% 3:4 ~ "Vascular dementia", ## probable and possible vascular dementia
+                                      ADFDX1 %in% 5:19 ~ "Other dementia", ## dementia of undetermined etiology, alcoholic dementia, probable lewy body dementia, frontal lobe dementia, Parkinson's, normal pressure hydrocephalus, severe head trauma (with residual)
+                                      ADFDX1 %in% 20:22 ~ "MCI", ## mild-ambiguous, cognitive impairment secondary to vascular disease, MCI 
+                                      ADFDX1 %in% 28:30 ~ "MCI secondary to other conditions", ## stroke, other neurological, other medical 
+                                      ADFDX1 == 31 ~ "Normal", 
+                                      ADFDX1 %in% 23:27 ~ "Psychiatric and alcohol"),
+                diagnosis_adams = case_when(diagnosis %in% c("Alzheimer's disease", "Vascular dementia", "Other dementia") ~ "Dementia",
+                                            diagnosis %in% c("MCI", "MCI secondary to other conditions", "Psychiatric and alcohol") ~ "MCI",
+                                            diagnosis %in% c("Normal") ~ "Normal"), 
+                diagnosis_adjusted = case_when(diagnosis %in% c("Alzheimer's disease", "Vascular dementia", "Other dementia") ~ "Dementia",
+                                               diagnosis %in% c("MCI", "MCI secondary to other conditions") ~ "MCI",
+                                               diagnosis %in% c("Normal", "Psychiatric and alcohol") ~ "Normal"), 
+                diagnosis_2cat = case_when(diagnosis_adams == "Dementia" ~ "Dementia",
+                                           diagnosis_adams %in% c("MCI", "Normal") ~ "No Dementia"),
                 diagnosis_2cat = factor(diagnosis_2cat, levels = c("Dementia", "No Dementia")),                                         
-                diagnosis = factor(diagnosis, levels = c("Probable AD", "Possible AD", "Probable vascular dementia", "Possible vascular dementia", "Other dementia", "Other neurological", "MCI", "Psychiatric", "Normal")), 
-                diagnosis_3cat = factor(diagnosis_3cat, levels = c("Dementia", "MCI", "Normal")),
-                stroke = as.numeric(ADFDX1 == 28), 
-                diagnosis_3cat_ADAMS = factor(case_when(ADFDX1 %in% c(1:19) ~ "Dementia", 
-                                                        ADFDX1 %in% c(20:30) ~ "CIND", 
-                                                        ADFDX1 == 31 ~ "Normal"), 
-                                              levels = c("Dementia", "CIND", "Normal"))) %>%
-  dplyr::select(ADAMSSID, diagnosis, diagnosis_3cat, diagnosis_2cat, diagnosis_3cat_ADAMS, stroke)
+                diagnosis = factor(diagnosis, levels = c("Alzheimer's disease", "Vascular dementia", "Other dementia", "MCI", "MCI secondary to other conditions", "Psychiatric and alcohol", "Normal")), 
+                diagnosis_adams = factor(diagnosis_adams, levels = c("Dementia", "MCI", "Normal")),
+                diagnosis_adjusted = factor(diagnosis_adjusted, levels = c("Dementia", "MCI", "Normal")),
+                stroke = as.numeric(ADFDX1 == 28)) %>%
+  dplyr::left_join(ADAMS1BD_R %>% dplyr::select(ADAMSSID, BDFDX1), by = "ADAMSSID") %>%
+  dplyr::mutate(diagnosis_b = case_when(BDFDX1 %in% 1:2 ~ "Alzheimer's disease", ## probable and possible AD
+                                        BDFDX1 %in% 3:4 ~ "Vascular dementia", ## probable and possible vascular dementia
+                                        BDFDX1 %in% 5:19 ~ "Other dementia", ## dementia of undetermined etiology, alcoholic dementia, probable lewy body dementia, frontal lobe dementia, Parkinson's, normal pressure hydrocephalus, severe head trauma (with residual)
+                                        BDFDX1 %in% c(20:22, 33) ~ "MCI", ## mild-ambiguous, cognitive impairment secondary to vascular disease, MCI 
+                                        BDFDX1 %in% 28:30 ~ "MCI secondary to other conditions", ## stroke, other neurological, other medical 
+                                        BDFDX1 == 31 ~ "Normal", 
+                                        BDFDX1 %in% 23:27 ~ "Psychiatric and alcohol"),
+                diagnosis_adams_b = case_when(diagnosis_b %in% c("Alzheimer's disease", "Vascular dementia", "Other dementia") ~ "Dementia",
+                                              diagnosis_b %in% c("MCI", "MCI secondary to other conditions", "Psychiatric and alcohol") ~ "MCI",
+                                              diagnosis_b %in% c("Normal") ~ "Normal"), 
+                diagnosis_adjusted_b = case_when(diagnosis_b %in% c("Alzheimer's disease", "Vascular dementia", "Other dementia") ~ "Dementia",
+                                                 diagnosis_b %in% c("MCI", "MCI secondary to other conditions") ~ "MCI",
+                                                 diagnosis_b %in% c("Normal", "Psychiatric and alcohol") ~ "Normal"), 
+                diagnosis_2cat_b = case_when(diagnosis_adams_b == "Dementia" ~ "Dementia",
+                                           diagnosis_adams_b %in% c("MCI", "Normal") ~ "No Dementia"),
+                diagnosis_2cat_b = factor(diagnosis_2cat_b, levels = c("Dementia", "No Dementia")),                                         
+                diagnosis_b = factor(diagnosis_b, levels = c("Alzheimer's disease", "Vascular dementia", "Other dementia", "MCI", "MCI secondary to other conditions", "Psychiatric and alcohol", "Normal")), 
+                diagnosis_adams_b = factor(diagnosis_adams_b, levels = c("Dementia", "MCI", "Normal")),
+                diagnosis_adjusted_b = factor(diagnosis_adjusted_b, levels = c("Dementia", "MCI", "Normal"))) %>%
+  dplyr::left_join(ADAMS1CD_R %>% dplyr::select(ADAMSSID, CDFDX1), by = "ADAMSSID") %>%
+  dplyr::mutate(diagnosis_c = case_when(CDFDX1 %in% 1:2 ~ "Alzheimer's disease", ## probable and possible AD
+                                        CDFDX1 %in% 3:4 ~ "Vascular dementia", ## probable and possible vascular dementia
+                                        CDFDX1 %in% 5:19 ~ "Other dementia", ## dementia of undetermined etiology, alcoholic dementia, probable lewy body dementia, frontal lobe dementia, Parkinson's, normal pressure hydrocephalus, severe head trauma (with residual)
+                                        CDFDX1 %in% c(20:22, 33) ~ "MCI", ## mild-ambiguous, cognitive impairment secondary to vascular disease, MCI 
+                                        CDFDX1 %in% 28:30 ~ "MCI secondary to other conditions", ## stroke, other neurological, other medical 
+                                        CDFDX1 == 31 ~ "Normal", 
+                                        CDFDX1 %in% 23:27 ~ "Psychiatric and alcohol"),
+                diagnosis_adams_c = case_when(diagnosis_c %in% c("Alzheimer's disease", "Vascular dementia", "Other dementia") ~ "Dementia",
+                                              diagnosis_c %in% c("MCI", "MCI secondary to other conditions", "Psychiatric and alcohol") ~ "MCI",
+                                              diagnosis_c %in% c("Normal") ~ "Normal"), 
+                diagnosis_adjusted_c = case_when(diagnosis_c %in% c("Alzheimer's disease", "Vascular dementia", "Other dementia") ~ "Dementia",
+                                                 diagnosis_c %in% c("MCI", "MCI secondary to other conditions") ~ "MCI",
+                                                 diagnosis_c %in% c("Normal", "Psychiatric and alcohol") ~ "Normal"), 
+                diagnosis_2cat_c = case_when(diagnosis_adams_c == "Dementia" ~ "Dementia",
+                                           diagnosis_adams_c %in% c("MCI", "Normal") ~ "No Dementia"),
+                diagnosis_2cat_c = factor(diagnosis_2cat_c, levels = c("Dementia", "No Dementia")),                                         
+                diagnosis_c = factor(diagnosis_c, levels = c("Alzheimer's disease", "Vascular dementia", "Other dementia", "MCI", "MCI secondary to other conditions", "Psychiatric and alcohol", "Normal")), 
+                diagnosis_adams_c = factor(diagnosis_adams_c, levels = c("Dementia", "MCI", "Normal")),
+                diagnosis_adjusted_c = factor(diagnosis_adjusted_c, levels = c("Dementia", "MCI", "Normal"))) %>%
+  dplyr::select(ADAMSSID, diagnosis, diagnosis_adams, diagnosis_adjusted, diagnosis_2cat, stroke, 
+                diagnosis_b, diagnosis_adams_b, diagnosis_adjusted_b, diagnosis_2cat_b,
+                diagnosis_c, diagnosis_adams_c, diagnosis_adjusted_c, diagnosis_2cat_c) %>%
+  dplyr::left_join(mortality, by = "ADAMSSID") 
 
+## update with information from the future (for MCI due to other conditions)
+# - if diagnosed with dementia at wave B -> MCI at wave A
+# - if diagnosed with dementia at wave C -> MCI at wave A
+# - if diagnosed normal at wave B -> normal at wave A 
+# - if diagnosed normal at wave C -> normal at wave A 
+# - if remain in the MCI secondary to other conditions category for all remaining waves, move to normal 
 
 #### Demographics
 
@@ -375,13 +432,12 @@ disability <- ADAMS1TRK_R %>%
   dplyr::mutate(iadl = ifelse(hhidpn == "203309010", iadl2000, iadl)) %>% ## deal with one person with missing iadl (due to don't do) and assign them to the wave earlier               
   dplyr::select(ADAMSSID, adl, iadl)
 
-
 # Stacking it up
 
 join_list <- list(
   vdori1, vdmde1, vdmde2, vdmde3, vdmde4, vdmre1, vdmde6, vdexf2, vdexf8, vdexf9,
   vdasp1, vdasp2, vdasp3, vdlfl1, vdlfl2, vdlfl3, vdlfl4, vdlfl5, vdlfl7, vdlfl8,
-  vdvis1, iqcode, blessed, dementia, demographics, sr_health, disability
+  vdvis1, iqcode, blessed, dementia, demographics, sr_health, disability, mortality
 )
 
 tidied <- Reduce(function(x, y) left_join(x, y, by = "ADAMSSID"), join_list) %>%

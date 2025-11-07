@@ -1,5 +1,10 @@
 rm(list = setdiff(ls(), lsf.str())[!(setdiff(ls(), lsf.str()) %in% "params")])
-user <- "Emma"; code_filepath <- "C:\\Users\\emmanich\\code\\ADAMS-HCAP-ALGO\\"
+user <- "Emma"
+if (Sys.info()["sysname"] == "Windows") {
+    code_filepath <- "C:\\Users\\emmanich\\code\\ADAMS-HCAP-ALGO\\"
+} else {
+    code_filepath <- "/Users/emmanich/code/ADAMS-HCAP-ALGO/"
+}
 source(here::here(paste0(code_filepath, "001_libraries.R")))
 source(here::here(paste0(code_filepath, "002_directories.R")))
 
@@ -15,9 +20,14 @@ ADAMS1TRK_R <- haven::read_dta(fs::path(data_filepath, "ADAMS1TRK_R.dta"))
 
 ADAMS1AG_R <- haven::read_sav(fs::path(data_filepath, "ADAMS1AG_R.sav"))
 
-## AD_R has the blessed
+## AD_R has the blessed and diagnoses
 
 ADAMS1AD_R <- haven::read_sav(fs::path(data_filepath, "ADAMS1AD_R.sav"))
+
+## diagnoses for follow-up waves 
+
+ADAMS1BD_R <- haven::read_sav(fs::path(data_filepath, "ADAMS1BD_R.sav"))
+ADAMS1CD_R <- haven::read_sav(fs::path(data_filepath, "ADAMS1CD_R.sav"))
 
 ## rand 2000 for self-rated memory 
 

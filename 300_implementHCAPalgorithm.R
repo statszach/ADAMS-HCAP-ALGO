@@ -1,5 +1,10 @@
 rm(list = setdiff(ls(), lsf.str())[!(setdiff(ls(), lsf.str()) %in% "params")])
-user <- "Emma"; code_filepath <- "C:\\Users\\emmanich\\code\\ADAMS-HCAP-ALGO\\"
+user <- "Emma"
+if (Sys.info()["sysname"] == "Windows") {
+    code_filepath <- "C:\\Users\\emmanich\\code\\ADAMS-HCAP-ALGO\\"
+} else {
+    code_filepath <- "/Users/emmanich/code/ADAMS-HCAP-ALGO/"
+}
 source(here::here(paste0(code_filepath, "001_libraries.R")))
 source(here::here(paste0(code_filepath, "002_directories.R")))
 
@@ -12,7 +17,7 @@ domain_scores <- c("ORI", "MEM", "EXF", "LFL", "VIS")
 
 data <- as.data.table(merge(tidied, fscores, by = "ADAMSSID"))
 
-## using Rich's knots for spline, could change to looking at ADAMS data separately 
+## using Rich's knots for spline
 adjust_vars <- c("splines::ns(age, knots = c(78, 86, 94))", "female", "edyrs", "race")
 
 # FORMAT DATA ------------------------------------------------------------
