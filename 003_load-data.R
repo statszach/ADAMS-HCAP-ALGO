@@ -1,7 +1,7 @@
 rm(list = setdiff(ls(), lsf.str())[!(setdiff(ls(), lsf.str()) %in% "params")])
 user <- "Emma"
 if (Sys.info()["sysname"] == "Windows") {
-    code_filepath <- "C:\\Users\\emmanich\\code\\ADAMS-HCAP-ALGO\\"
+    code_filepath <- "C:/Users/emmanich/code/ADAMS-HCAP-ALGO/"
 } else {
     code_filepath <- "/Users/emmanich/code/ADAMS-HCAP-ALGO/"
 }

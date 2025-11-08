@@ -1,7 +1,7 @@
 rm(list = setdiff(ls(), lsf.str())[!(setdiff(ls(), lsf.str()) %in% "params")])
 user <- "Emma"
 if (Sys.info()["sysname"] == "Windows") {
-    code_filepath <- "C:\\Users\\emmanich\\code\\ADAMS-HCAP-ALGO\\"
+    code_filepath <- "C:/Users/emmanich/code/ADAMS-HCAP-ALGO/"
 } else {
     code_filepath <- "/Users/emmanich/code/ADAMS-HCAP-ALGO/"
 }
@@ -315,9 +315,12 @@ dementia <- ADAMS1AD_R %>%
                 diagnosis_adjusted = case_when(diagnosis %in% c("Alzheimer's disease", "Vascular dementia", "Other dementia") ~ "Dementia",
                                                diagnosis %in% c("MCI", "MCI secondary to other conditions") ~ "MCI",
                                                diagnosis %in% c("Normal", "Psychiatric and alcohol") ~ "Normal"), 
-                diagnosis_2cat = case_when(diagnosis_adams == "Dementia" ~ "Dementia",
+                diagnosis_adams_2cat = case_when(diagnosis_adams == "Dementia" ~ "Dementia",
                                            diagnosis_adams %in% c("MCI", "Normal") ~ "No Dementia"),
-                diagnosis_2cat = factor(diagnosis_2cat, levels = c("Dementia", "No Dementia")),                                         
+                diagnosis_adams_2cat = factor(diagnosis_adams_2cat, levels = c("Dementia", "No Dementia")), 
+                diagnosis_adjusted_2cat = case_when(diagnosis_adjusted == "Dementia" ~ "Dementia",
+                                                    diagnosis_adjusted %in% c("MCI", "Normal") ~ "No Dementia"),
+                diagnosis_adjusted_2cat = factor(diagnosis_adjusted_2cat, levels = c("Dementia", "No Dementia")),                                        
                 diagnosis = factor(diagnosis, levels = c("Alzheimer's disease", "Vascular dementia", "Other dementia", "MCI", "MCI secondary to other conditions", "Psychiatric and alcohol", "Normal")), 
                 diagnosis_adams = factor(diagnosis_adams, levels = c("Dementia", "MCI", "Normal")),
                 diagnosis_adjusted = factor(diagnosis_adjusted, levels = c("Dementia", "MCI", "Normal")),
@@ -362,10 +365,18 @@ dementia <- ADAMS1AD_R %>%
                 diagnosis_c = factor(diagnosis_c, levels = c("Alzheimer's disease", "Vascular dementia", "Other dementia", "MCI", "MCI secondary to other conditions", "Psychiatric and alcohol", "Normal")), 
                 diagnosis_adams_c = factor(diagnosis_adams_c, levels = c("Dementia", "MCI", "Normal")),
                 diagnosis_adjusted_c = factor(diagnosis_adjusted_c, levels = c("Dementia", "MCI", "Normal"))) %>%
-  dplyr::select(ADAMSSID, diagnosis, diagnosis_adams, diagnosis_adjusted, diagnosis_2cat, stroke, 
+  dplyr::select(ADAMSSID, diagnosis, diagnosis_adams, diagnosis_adjusted, diagnosis_adams_2cat, diagnosis_adjusted_2cat, stroke, 
                 diagnosis_b, diagnosis_adams_b, diagnosis_adjusted_b, diagnosis_2cat_b,
                 diagnosis_c, diagnosis_adams_c, diagnosis_adjusted_c, diagnosis_2cat_c) %>%
-  dplyr::left_join(mortality, by = "ADAMSSID") 
+  dplyr::left_join(mortality, by = "ADAMSSID") %>%
+  dplyr::mutate(diagnosis_adjusted2 = case_when(diagnosis == "MCI secondary to other conditions" & (diagnosis_2cat_b == "Dementia" | diagnosis_2cat_c == "Dementia") ~ "MCI", 
+                                                diagnosis == "MCI secondary to other conditions" & (diagnosis_2cat_b == "No Dementia" | diagnosis_2cat_c == "No Dementia") ~ "Normal",
+                                                diagnosis == "MCI secondary to other conditions" & (diagnosis_b == "MCI secondary to other conditions" & diagnosis_c == "MCI secondary to other conditions") ~ "Normal",
+                                                TRUE ~ diagnosis_adjusted), 
+                diagnosis_adjusted2 = factor(diagnosis_adjusted2, levels = c("Dementia", "MCI", "Normal")),
+                diagnosis_adjusted2_2cat = case_when(diagnosis_adjusted2 == "Dementia" ~ "Dementia",
+                                                     diagnosis_adjusted2 %in% c("MCI", "Normal") ~ "No Dementia"),
+                diagnosis_adjusted2_2cat = factor(diagnosis_adjusted2_2cat, levels = c("Dementia", "No Dementia")))
 
 ## update with information from the future (for MCI due to other conditions)
 # - if diagnosed with dementia at wave B -> MCI at wave A
@@ -437,7 +448,7 @@ disability <- ADAMS1TRK_R %>%
 join_list <- list(
   vdori1, vdmde1, vdmde2, vdmde3, vdmde4, vdmre1, vdmde6, vdexf2, vdexf8, vdexf9,
   vdasp1, vdasp2, vdasp3, vdlfl1, vdlfl2, vdlfl3, vdlfl4, vdlfl5, vdlfl7, vdlfl8,
-  vdvis1, iqcode, blessed, dementia, demographics, sr_health, disability, mortality
+  vdvis1, iqcode, blessed, dementia, demographics, sr_health, disability
 )
 
 tidied <- Reduce(function(x, y) left_join(x, y, by = "ADAMSSID"), join_list) %>%

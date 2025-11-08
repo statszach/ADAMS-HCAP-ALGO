@@ -1,7 +1,7 @@
 rm(list = setdiff(ls(), lsf.str())[!(setdiff(ls(), lsf.str()) %in% "params")])
 user <- "Emma"
 if (Sys.info()["sysname"] == "Windows") {
-    code_filepath <- "C:\\Users\\emmanich\\code\\ADAMS-HCAP-ALGO\\"
+    code_filepath <- "C:/Users/emmanich/code/ADAMS-HCAP-ALGO/"
 } else {
     code_filepath <- "/Users/emmanich/code/ADAMS-HCAP-ALGO/"
 }
@@ -43,6 +43,12 @@ classify <- function(all_data = data, normative_data){
     
     dt <- copy(all_data); normative_dt <- copy(normative_data)
 
+    ## check if need to adjust max age knot
+    max_age <- normative_dt[, max(age)]
+    if (max_age <= 95){
+        adjust_vars <- gsub(", 94", "", adjust_vars)
+    }
+
     ## blom transformed versions in normative sample
     blom_transform <- function(x){
         ranks <- rank(x, na.last = "keep")
@@ -63,12 +69,12 @@ classify <- function(all_data = data, normative_data){
     ## get predicted blom in the full sample 
     setDT(dt) ## tbh I'm not totally sure why this is needed, but it has to do with shallow copies, and it gets rid of a warning for below
     dt[, paste0(domain_scores, "_b_pred") := 
-        lapply(1:length(domain_scores), function(x) predict(blom_models[[x]], newdata = dt))]
+        lapply(1:length(domain_scores), function(x) as.numeric(predict(blom_models[[x]], newdata = dt)))]
 
     ## add predicted blom scores to normative dataset (Q: use true blom transformed or prediction, currently prediction)
     setDT(normative_dt) ## tbh I'm not totally sure why this is needed, but it has to do with shallow copies, and it gets rid of a warning for below
     normative_dt[, paste0(domain_scores, "_b_pred") := 
-                lapply(1:length(domain_scores), function(x) predict(blom_models[[x]], newdata = normative_dt))]
+                lapply(1:length(domain_scores), function(x) as.numeric(predict(blom_models[[x]], newdata = normative_dt)))]
 
     ## get SD of blom in normative sample 
     blom_sds <- as.numeric(normative_dt[, lapply(.SD, sd, na.rm = TRUE), .SDcols = paste0(domain_scores, "_b_pred")])
@@ -78,8 +84,7 @@ classify <- function(all_data = data, normative_data){
 
     ## special case no age/gender interaction or age/race interaction when excluding iadls
     if (normative_dt[, length(unique(iadl))] == 1) interaction_terms <- interaction_terms[!interaction_terms %in% c("splines::ns(age, knots = c(78, 86, 94)):female",
-                                                                                                            "splines::ns(age, knots = c(78, 86, 94)):race")]
-
+                                                                                             "splines::ns(age, knots = c(78, 86, 94)):race")]
     ## normative models
     normative_design <- survey::svydesign(ids = ~1, weights = ~weight, data = normative_dt)
     norms_models <- lapply(domain_scores, function(score){
@@ -88,7 +93,7 @@ classify <- function(all_data = data, normative_data){
     })
 
     ## warning for problematic interaction terms  
-    largecoefs <- lapply(norms_models, function(x) any(tidy(x)$estimate > 10)) ## any coefficient over ten
+    largecoefs <- lapply(norms_models, function(x) any(broom::tidy(x)$estimate > 10)) ## any coefficient over ten
     if (any(unlist(largecoefs))) warning(paste0("Large coefficient detected in normative model: ", paste0(domain_scores[unlist(largecoefs)], collapse = ", ")))
 
     ## get model r2s 
@@ -110,7 +115,7 @@ classify <- function(all_data = data, normative_data){
                             lapply(.SD, function(x) c(mean = mean(x, na.rm = TRUE), sd = sd(x, na.rm = TRUE))), 
                             .SDcols = paste0(domain_scores, "_T_score")]
     print(check_tscore)                   
-    if (any(sapply(check_tscore[1,], function(x) abs(x-50) >= 4)) | any(sapply(check_tscore[2,], function(x) abs(x-10) >= 2.5))) {
+    if (any(sapply(check_tscore[1,], function(x) abs(x-50) >= 4)) | any(sapply(check_tscore[2,], function(x) abs(x-10) >= 3))) {
         warning("T-score mean and/or sd not equal to 50 and/or 10 in Reference Sample")
     }
 
@@ -143,12 +148,14 @@ classify <- function(all_data = data, normative_data){
     return(dt)
 }
 
-class_dt1 <- classify(all_data = data, normative_data = data[diagnosis_3cat == "Normal"])
-class_dt2 <- classify(all_data = data, normative_data = data[diagnosis_3cat == "Normal" & stroke == 0])
-class_dt3 <- classify(all_data = data, normative_data = data[diagnosis_3cat == "Normal" & iadl == 0])
-class_dt4 <- classify(all_data = data, normative_data = data[diagnosis_3cat == "Normal" & iadl == 0 & stroke == 0])
+class_dt1 <- classify(all_data = data, normative_data = data[diagnosis_adjusted == "Normal"])
+class_dt2 <- classify(all_data = data, normative_data = data[diagnosis_adams == "Normal"])
+class_dt3 <- classify(all_data = data, normative_data = data[diagnosis_adjusted2 == "Normal"])
+class_dt4 <- classify(all_data = data, normative_data = data[diagnosis_adjusted == "Normal" & iadl == 0])
 
 # PRINT RESULTS -----------------------------------------------------------
+
+mean_design <- survey::svydesign(ids = ~1, weights = ~weight, data = data)
 
 print_results <- function(data){
     ## numbers for figure
@@ -192,13 +199,13 @@ print_results(class_dt4)
 
 # MAKE COMPARISONS -----------------------------------------------------------
 
-## prevalence of clinical dementia and MCI
-clinical_dementia_prevalence <- survey::svyciprop(~I(diagnosis_3cat == "Dementia"), design = mean_design)
-clinical_mci_prevalence <- survey::svyciprop(~I(diagnosis_3cat == "MCI"), design = mean_design)
+## prevalence of clinical dementia and MCI (via main analysis)
+clinical_dementia_prevalence <- survey::svyciprop(~I(diagnosis_adjusted == "Dementia"), design = mean_design)
+clinical_mci_prevalence <- survey::svyciprop(~I(diagnosis_adjusted == "MCI"), design = mean_design)
 
 ## prevalence of clinical dementia and MCI (original ADAMS definition)
-ADAMSorig_dementia_prevalence <- survey::svyciprop(~I(diagnosis_3cat_ADAMS == "Dementia"), design = mean_design)
-ADAMSorig_cind_prevalence <- survey::svyciprop(~I(diagnosis_3cat_ADAMS == "CIND"), design = mean_design)
+ADAMSorig_dementia_prevalence <- survey::svyciprop(~I(diagnosis_adams == "Dementia"), design = mean_design)
+ADAMSorig_cind_prevalence <- survey::svyciprop(~I(diagnosis_adams == "MCI"), design = mean_design)
 
 # SAVE RESULTS -----------------------------------------------------------------
 

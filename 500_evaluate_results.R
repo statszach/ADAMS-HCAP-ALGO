@@ -1,5 +1,10 @@
 rm(list = setdiff(ls(), lsf.str())[!(setdiff(ls(), lsf.str()) %in% "params")])
-user <- "Emma"; code_filepath <- "C:\\Users\\emmanich\\code\\ADAMS-HCAP-ALGO\\"
+user <- "Emma"
+if (Sys.info()["sysname"] == "Windows") {
+    code_filepath <- "C:/Users/emmanich/code/ADAMS-HCAP-ALGO/"
+} else {
+    code_filepath <- "/Users/emmanich/code/ADAMS-HCAP-ALGO/"
+}
 source(here::here(paste0(code_filepath, "001_libraries.R")))
 source(here::here(paste0(code_filepath, "002_directories.R")))
 
@@ -10,13 +15,30 @@ algo_data <- read_rds(paste0(rds_filepath, "hcapalgo.rds"))
 date <- format(Sys.Date(), "%Y_%m_%d")
 
 ## relevel diagnoses so first level is normal 
-diag_vars <- c("diagnosis_3cat", "diagnosis_2cat", "predicted_3cat", "predicted_2cat", "predicted_2cat_s1", "predicted_3cat_s1",
+diag_vars <- c("diagnosis_adams", "diagnosis_adjusted", "diagnosis_adjusted2", 
+               "diagnosis_adams_2cat", "diagnosis_adjusted_2cat", "diagnosis_adjusted2_2cat",
+               "predicted_3cat", "predicted_2cat", "predicted_2cat_s1", "predicted_3cat_s1",
                "predicted_2cat_s2", "predicted_3cat_s2", "predicted_2cat_s3", "predicted_3cat_s3")
 algo_data[, (diag_vars) := lapply(.SD, function(x) factor(x, levels = rev(levels(x)))), .SDcols = diag_vars]
 
 # MAKE CONTINGENCY TABLES --------------------------------------------------
 
-make_contingency_plot <- function(algorithm_data, truth, algo){
+## all combos for three-category classification
+analysis_combos_3cat <- as.data.table(expand.grid(truths = c("diagnosis_adjusted", "diagnosis_adams", "diagnosis_adjusted2"), 
+                                                  algorithms = c("predicted_3cat", "predicted_3cat_s1", "predicted_3cat_s2", "predicted_3cat_s3")))
+analysis_combos_3cat[, names(analysis_combos_3cat) := lapply(.SD, as.character), .SDcols = names(analysis_combos_3cat)]
+
+## repeat this for two-category versions 
+analysis_combos_2cat <- copy(analysis_combos_3cat)
+analysis_combos_2cat[, `:=` (truths = paste0(truths, "_2cat"), algorithms = gsub("3cat", "2cat", algorithms))]
+
+## combine to full map 
+version_map <- rbind(analysis_combos_3cat, analysis_combos_2cat)
+
+make_contingency_plot <- function(algorithm_data = algo_data, row){
+
+    truth <- version_map[, truths][row]; algo <- version_map[, algorithms][row]
+    print(paste0(truth, " - ", algo))
 
     ## get freq data
     data <- copy(algorithm_data)
@@ -29,6 +51,14 @@ make_contingency_plot <- function(algorithm_data, truth, algo){
     weighted_table <- survey::svytable(as.formula(paste0("~", algo, "+", truth)), design = design)
     kappas <- vcd::Kappa(weighted_table); kappas_confint <- confint(kappas)
 
+    ## get text 
+    text_toinclude <- paste0("Unweighted Kappa = ", sprintf("%.2f", kappas$Unweighted[1]), 
+                                          " (95% CI: ", sprintf("%.2f", kappas_confint[1,1]), " to ", sprintf("%.2f", kappas_confint[1,2]), ")")
+    if (data[, length(levels(get(truth)))] > 2){
+        text_toinclude <- paste0(text_toinclude, "\nWeighted Kappa = ", sprintf("%.2f", kappas$Weighted[1]), 
+                                          " (95% CI: ", sprintf("%.2f", kappas_confint[2,1]), " to ", sprintf("%.2f", kappas_confint[2,2]), ")")
+    }                            
+
     ## make plot 
     truth_levels <- data[, levels(get(truth))]
     table_dt[, truth := factor(truth, levels = truth_levels)]
@@ -38,45 +68,36 @@ make_contingency_plot <- function(algorithm_data, truth, algo){
         scale_fill_gradient(low = "white", high = "#73498c") +
         scale_x_discrete(position = "top") +
         guides(fill = "none") +
-        labs(y = "Algorithm diagnosis", x = "Clinical diagnosis") +
+        labs(y = "Algorithm diagnosis", x = "Clinical diagnosis", caption = text_toinclude) +
         theme_void() +
-        theme(axis.text = element_text(size = 12), axis.title = element_text(size = 14, face = "bold", margin = margin(b = 15)), 
-              axis.title.y = element_text(angle = 90, margin = margin(r = 15)))
+        theme(axis.text = element_text(size = 8), axis.title = element_text(size = 8, face = "bold", margin = margin(b = 15)), 
+              axis.title.y = element_text(angle = 90, margin = margin(r = 15)), plot.caption = element_text(hjust = 0.5, size = 8)) 
 
-    ## make text grob (add weighted if more than 2 categories)
-    text_toinclude <- paste0("Unweighted Kappa = ", sprintf("%.2f", kappas$Unweighted[1]), 
-                                          " (95% CI: ", sprintf("%.2f", kappas_confint[1,1]), " to ", sprintf("%.2f", kappas_confint[1,2]), ")")
-    if (data[, length(levels(get(truth)))] > 2){
-        text_toinclude <- paste0(text_toinclude, "\nWeighted Kappa = ", sprintf("%.2f", kappas$Weighted[1]), 
-                                          " (95% CI: ", sprintf("%.2f", kappas_confint[2,1]), " to ", sprintf("%.2f", kappas_confint[2,2]), ")")
-    }                                          
-    text_grob <- ggpubr::text_grob(text_toinclude, size = 12)
-
-    combined_plot <- plot / patchwork::wrap_elements(text_grob) + plot_layout(heights = c(4, 1))
-    return(combined_plot)
+    return(plot)
 }
 
-plot_3cat <- make_contingency_plot(algorithm_data = algo_data, truth = "diagnosis_3cat", algo = "predicted_3cat")
-plot_2cat <- make_contingency_plot(algorithm_data = algo_data, truth = "diagnosis_2cat", algo = "predicted_2cat")
+all_plots <- lapply(1:nrow(version_map), function(x) make_contingency_plot(row = x))
 
-plot_3cat_s1 <- make_contingency_plot(algorithm_data = algo_data, truth = "diagnosis_3cat", algo = "predicted_3cat_s1")
-plot_2cat_s1 <- make_contingency_plot(algorithm_data = algo_data, truth = "diagnosis_2cat", algo = "predicted_2cat_s1")
+## create plot grids 
 
-plot_3cat_s2 <- make_contingency_plot(algorithm_data = algo_data, truth = "diagnosis_3cat", algo = "predicted_3cat_s2")
-plot_2cat_s2 <- make_contingency_plot(algorithm_data = algo_data, truth = "diagnosis_2cat", algo = "predicted_2cat_s2")
+## for diagnosis based on adjusted ADAMS, ADAMS, adjusted ADAMS (2) - using future for CIND with medical conditions
 
-plot_3cat_s3 <- make_contingency_plot(algorithm_data = algo_data, truth = "diagnosis_3cat", algo = "predicted_3cat_s3")
-plot_2cat_s3 <- make_contingency_plot(algorithm_data = algo_data, truth = "diagnosis_2cat", algo = "predicted_2cat_s3")
+## predictions for normative sample with adjusted ADAMS
+grid1 <- wrap_plots(all_plots[c(1:3, 13:15)]) + plot_layout(nrow = 2)
+
+## predictions for normative sample with ADAMS 
+grid2 <- wrap_plots(all_plots[c(4:6, 16:18)]) + plot_layout(nrow = 2)
+
+## predictions for normative sample with adjusted ADAMS v2 
+grid3 <- wrap_plots(all_plots[c(7:9, 19:21)]) + plot_layout(nrow = 2)
+
+## predictions for normative sample with adjusted ADAMS and additional exclusion of those with IADL limitations 
+grid4 <- wrap_plots(all_plots[c(10:12, 22:24)]) + plot_layout(nrow = 2)
 
 ## save all options in same file 
-pdf(paste0(images_filepath, "all_3cat_contingency_tables_", date, ".pdf"), width = 10, height = 5)
-plot_3cat; plot_3cat_s1; plot_3cat_s2; plot_3cat_s3
+pdf(paste0(images_filepath, "all_contingency_tables_", date, ".pdf"), width = 10, height = 5)
+grid1; grid2; grid3; grid4
 dev.off()
-
-ggsave(paste0(images_filepath, "contingency_3cat_", date, ".pdf"), plot_3cat, width = 10, height = 5)
-ggsave(paste0(images_filepath, "contingency_2cat_", date, ".pdf"), plot_2cat, width = 10, height = 5)
-ggsave(paste0(images_filepath, "contingency_3cat_s1_", date, ".pdf"), plot_3cat_s1, width = 10, height = 5)
-ggsave(paste0(images_filepath, "contingency_2cat_s1_", date, ".pdf"), plot_2cat_s1, width = 10, height = 5)
 
 # LOOK AT OFF DIAGONALS -----------------------------------------------------------
 
