@@ -70,8 +70,8 @@ make_contingency_plot <- function(algorithm_data = algo_data, row){
         guides(fill = "none") +
         labs(y = "Algorithm diagnosis", x = "Clinical diagnosis", caption = text_toinclude) +
         theme_void() +
-        theme(axis.text = element_text(size = 8), axis.title = element_text(size = 8, face = "bold", margin = margin(b = 15)), 
-              axis.title.y = element_text(angle = 90, margin = margin(r = 15)), plot.caption = element_text(hjust = 0.5, size = 8)) 
+        theme(axis.text = element_text(size = 8), axis.title = element_text(size = 8, face = "bold", margin = margin(b = 5)), 
+              axis.title.y = element_text(angle = 90, margin = margin(r = 5)), plot.caption = element_text(hjust = 0.5, size = 8)) 
 
     return(plot)
 }
