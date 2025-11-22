@@ -99,13 +99,15 @@ pdf(paste0(images_filepath, "all_contingency_tables_", date, ".pdf"), width = 10
 grid1; grid2; grid3; grid4
 dev.off()
 
+## based on this we are going to take adjusted ADAMS with the adjusted ADAMS normative sample as our main analysis
+
 # LOOK AT OFF DIAGONALS -----------------------------------------------------------
 
 ## get proportion in each diagnosis category by disagreement type
-disagreement_dt <- copy(algo_data[diagnosis_3cat != predicted_3cat, .(ADAMSSID, diagnosis_3cat, predicted_3cat, diagnosis, weight)])
-disagreement_dt[, disagreement_direction := ifelse((diagnosis_3cat == "Normal" & predicted_3cat %in% c("MCI", "Dementia") | 
-                                                   (diagnosis_3cat == "MCI" & predicted_3cat == "Dementia")), "Algorithm more severe", "Clinical diagnosis more severe")]
-disagreement_dt[, combo := factor(paste0(diagnosis_3cat, " - ", predicted_3cat), 
+disagreement_dt <- copy(algo_data[diagnosis_adjusted != predicted_3cat, .(ADAMSSID, diagnosis_adjusted, predicted_3cat, diagnosis, weight)])
+disagreement_dt[, disagreement_direction := ifelse((diagnosis_adjusted == "Normal" & predicted_3cat %in% c("MCI", "Dementia") | 
+                                                   (diagnosis_adjusted == "MCI" & predicted_3cat == "Dementia")), "Algorithm more severe", "Clinical diagnosis more severe")]
+disagreement_dt[, combo := factor(paste0(diagnosis_adjusted, " - ", predicted_3cat), 
                                          levels = c("Normal - Normal", "Normal - MCI", "Normal - Dementia", 
                                                     "MCI - Normal", "MCI - MCI", "MCI - Dementia", 
                                                     "Dementia - Normal", "Dementia - MCI", "Dementia - Dementia"))]  
@@ -113,34 +115,34 @@ disagreement_dt[, weight := scale(weight, center = FALSE, scale = sum(weight)/.N
 disagreement_dt[, total_N_combo := sum(weight), by = combo] ## get denominators for each combo
 disagreement_dt[, N_cat := paste0("N = ", .N), by = combo] ## get N for each combo
 disagreement_diagnosis_dt <- disagreement_dt[, .(prop_diagnosis = sum(weight)/unique(total_N_combo), 
-                                                 true_diagnosis = unique(diagnosis_3cat), 
+                                                 true_diagnosis = unique(diagnosis_adjusted), 
                                                  N_label = unique(N_cat)), by = .(diagnosis, combo)]
 
 ## get proportion in each diagnois by true diagnosis category (for fairness of comparison)
-agreement_dt <- copy(algo_data[diagnosis_3cat == predicted_3cat, .(ADAMSSID, diagnosis_3cat, predicted_3cat, diagnosis, weight)])
+agreement_dt <- copy(algo_data[diagnosis_adjusted == predicted_3cat, .(ADAMSSID, diagnosis_adjusted, predicted_3cat, diagnosis, weight)])
 agreement_dt[, weight := scale(weight, center = FALSE, scale = sum(weight)/.N)] ## scale weights to sum to n
-agreement_dt[, combo := factor(paste0(diagnosis_3cat, " - ", predicted_3cat), 
+agreement_dt[, combo := factor(paste0(diagnosis_adjusted, " - ", predicted_3cat), 
                                    levels = c("Normal - Normal", "Normal - MCI", "Normal - Dementia", 
                                                     "MCI - Normal", "MCI - MCI", "MCI - Dementia", 
                                                     "Dementia - Normal", "Dementia - MCI", "Dementia - Dementia"))]
 agreement_dt[, total_N_agreement := sum(weight), by = combo] ## get denominators for each diagnosis type
 agreement_dt[, N_cat := paste0("N = ", .N), by = combo] ## get N for each combo
 agreement_diagnosis_dt <- agreement_dt[, .(prop_diagnosis = sum(weight)/unique(total_N_agreement), 
-                                           true_diagnosis = unique(diagnosis_3cat),
+                                           true_diagnosis = unique(diagnosis_adjusted),
                                            combo = unique(combo), N_label = unique(N_cat)), by = diagnosis]
 
 ## put together
 full_diagnosis_dt <- rbind(disagreement_diagnosis_dt, agreement_diagnosis_dt)                                           
-full_diagnosis_dt[, diagnosis := factor(diagnosis, levels = rev(c("Normal", "Other neurological", "Psychiatric", 
-                                                              "MCI", "Possible AD", "Possible vascular dementia", 
-                                                              "Probable AD", "Probable vascular dementia", "Other dementia")))]
+full_diagnosis_dt[, diagnosis := factor(diagnosis, levels = rev(c("Normal", "Psychiatric and alcohol", 
+                                                                  "MCI", "MCI secondary to other conditions", 
+                                                                  "Alzheimer's disease", "Vascular dementia", "Other dementia")))]
 
 ## plot
 disagreement_plot <- ggplot(full_diagnosis_dt, aes(x = combo, y = prop_diagnosis, fill = diagnosis)) + 
     geom_bar(stat = "identity", position = "stack") + 
     geom_text(aes(label = N_label, y = 1.02)) +
     facet_wrap(~true_diagnosis, nrow = 1, scales = "free_x") +
-    scale_fill_manual(values = c("#2E598C", "#4b8ab1", "#9BD1F2",  "#f75e3b", "#f5825f", "#F7AF99", "#2b5627", "#59a852", "#B4CF66"), 
+    scale_fill_manual(values = c("#2E598C", "#9BD1F2",  "#f75e3b", "#F7AF99", "#2b5627", "#59a852", "#B4CF66"), 
     breaks = rev(full_diagnosis_dt[, levels(diagnosis)])) +
     scale_x_discrete(labels = scales::label_wrap(12)) +
     labs(x = "Classification \n(Clinical - Algorithm)", y = "Proportion with diagnosis", fill = "Clinical diagnosis") +
@@ -189,7 +191,7 @@ get_kappa_bycat <- function(algorithm_data, truth, algo, cat){
 ## get kappas for 3 category version 
 kappas_3cat <- rbindlist(lapply(c("age_group", "gender", "educ", "race"), 
                                 function(x) get_kappa_bycat(algorithm_data = algo_data, 
-                                                            truth = "diagnosis_3cat", 
+                                                            truth = "diagnosis_adjusted", 
                                                             algo = "predicted_3cat", 
                                                             cat = x)))
 
@@ -211,11 +213,11 @@ openxlsx::write.xlsx(kappas_3cat, paste0(images_filepath, "kappas_bychar_3cat_",
 # RISK RATIOS FOR UNDER/OVER DIAGNOSIS -------------------------------------------
 
 ## get indicator variable 
-algo_data[, misclassified := as.numeric(diagnosis_3cat != predicted_3cat)]
-algo_data[, underdiagnosed := as.numeric((diagnosis_3cat == "Dementia" & predicted_3cat %in% c("MCI", "Normal")) | 
-                                         (diagnosis_3cat == "MCI" & predicted_3cat == "Normal"))]
-algo_data[, overdiagnosed := as.numeric((diagnosis_3cat == "Normal" & predicted_3cat %in% c("MCI", "Dementia")) | 
-                                        (diagnosis_3cat == "MCI" & predicted_3cat == "Dementia"))]
+algo_data[, misclassified := as.numeric(diagnosis_adjusted != predicted_3cat)]
+algo_data[, underdiagnosed := as.numeric((diagnosis_adjusted == "Dementia" & predicted_3cat %in% c("MCI", "Normal")) | 
+                                         (diagnosis_adjusted == "MCI" & predicted_3cat == "Normal"))]
+algo_data[, overdiagnosed := as.numeric((diagnosis_adjusted == "Normal" & predicted_3cat %in% c("MCI", "Dementia")) | 
+                                        (diagnosis_adjusted == "MCI" & predicted_3cat == "Dementia"))]
 
 ## set normal to be the reference for diagnosis
 algo_data[, diagnosis := relevel(diagnosis, ref = "Normal")]
@@ -282,15 +284,23 @@ discrete_lims <- unlist(lapply(1:length(cats), function(x) c(str_subset(rr_plot_
 discrete_lims <- discrete_lims[-length(discrete_lims)] ## remove the last skip
 
 ## plot results
-plot_breaks <- c(0.4,0.6,0.8,1,2,3,4); log_breaks <- log(plot_breaks)
+plot_breaks <- c(0.2,0.4,0.6,0.8,1,2,3,4); log_breaks <- log(plot_breaks)
+y_limits <- c(log(0.2), log(4.2))
+rr_plot_dt[, lower_cap := pmax(rr_low, y_limits[1])]
+rr_plot_dt[, upper_cap := pmin(rr_high, y_limits[2])]
+
 rr_plot <- ggplot(rr_plot_dt, aes(x = cat_label, y = rr, ymin = rr_low, ymax = rr_high)) +
     geom_point(color = "#2d6a2d") +
     geom_errorbar(width = 0, color = "#2d6a2d") + 
+    geom_segment(data = rr_plot_dt[rr_low < y_limits[1]], aes(x = cat_label, xend = cat_label, y = upper_cap, yend = lower_cap),
+                 arrow = arrow(length = unit(0.3, "cm"), type = "closed"), show.legend = FALSE, color = "#2d6a2d") +
+    geom_segment(data = rr_plot_dt[rr_high > y_limits[2]], aes(x = cat_label, xend = cat_label, y = lower_cap, yend = upper_cap),
+                 arrow = arrow(length = unit(0.3, "cm"), type = "closed"), show.legend = FALSE, color = "#2d6a2d") +      
     geom_hline(yintercept = 0, linetype = "dashed", color = "black") +
     facet_wrap(~type, nrow = 1) +
     labs(x = "", y = "Relative risk") + 
     scale_x_discrete(breaks = rr_plot_dt[, levels(cat_label)], limits = discrete_lims) +
-    scale_y_continuous(breaks = log_breaks, labels = plot_breaks, limits = c(log(0.3), log(6)), oob = scales::oob_keep) +
+    scale_y_continuous(breaks = log_breaks, labels = plot_breaks, limits = y_limits, oob = scales::oob_keep, expand = expansion(0)) +
     coord_flip() +
     theme_bw()
 
