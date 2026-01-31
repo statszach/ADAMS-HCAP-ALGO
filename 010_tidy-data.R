@@ -391,6 +391,7 @@ demographics <- ADAMS1TRK_R %>%
   dplyr::filter(!AMONTH == 97) %>% ## exlcude those without Wave A assessment
   dplyr::select(ADAMSSID, age = AAGE, GENDER, ETHNIC, edyrs = EDYRS, degree = DEGREE, weight = AASAMPWT_F) %>%
   dplyr::mutate(age = na_if(age, 997), 
+                age2 = age^2,
                 edyrs = na_if(edyrs, 99), 
                 female = as.numeric(GENDER == 2), 
                 race = factor(case_when(ETHNIC == 1 ~ "White",
@@ -402,7 +403,7 @@ demographics <- ADAMS1TRK_R %>%
                                           degree == 4 ~ "College graduate",
                                           degree %in% 5:6 ~ "Post-graduate"),
                                 levels = c("Less than high school or GED", "High school graduate", "College graduate", "Post-graduate"))) %>%
-  dplyr::select(ADAMSSID, age, female, race, edyrs, degree, weight) 
+  dplyr::select(ADAMSSID, age, age2, female, race, edyrs, degree, weight) 
 
 
   ## Self rated health 
@@ -443,12 +444,175 @@ disability <- ADAMS1TRK_R %>%
   dplyr::mutate(iadl = ifelse(hhidpn == "203309010", iadl2000, iadl)) %>% ## deal with one person with missing iadl (due to don't do) and assign them to the wave earlier               
   dplyr::select(ADAMSSID, adl, iadl)
 
+## creating of variables for 10/66 algorithm 
+
+binary_items <- c(
+  "aPENCIL","aWATCH","aREPEAT","aTOWN","aCHIEF","aSTREET",
+  "aADDRESS","aMONTH","aDAY","aYEAR","aSEASON","aPENTAG"
+)
+
+alg1066_cog <- ADAMS1AN_R %>% 
+  select(
+    ADAMSSID,
+    aANIMALS  = ANAFTOT,
+    aSTORY    = ANWM1TOT,
+    aPENCIL   = ANMSE17,
+    aREPEAT   = ANMSE7,
+    aWATCH    = ANMSE16,
+    aTOWN     = ANMSE8,
+    aCHIEF    = ANPRES,
+    aSTREET   = ANMSE10,
+    aADDRESS  = ANMSE6,
+    aMONTH    = ANMSE3,
+    aDAY      = ANMSE5,
+    aYEAR     = ANMSE1,
+    aSEASON   = ANMSE2,
+    aPENTAG   = ANMSE22, 
+    aWORDIMM  = ANMSE11S, 
+    aWORDDEL1 = ANMSE13, 
+    aWORDDEL2 = ANMSE14,
+    aWORDDEL3 = ANMSE15, 
+    aPAPER1   = ANMSE20F, 
+    aPAPER2   = ANMSE20L, 
+    aPAPER3   = ANMSE20R
+  ) %>% ## recode binary items/incorrect values
+  mutate(across(
+    all_of(binary_items),
+    ~ case_when(
+      .x == 97 ~ NA_real_,
+      .x == 98 ~ 0,
+      .x == 99 ~ NA_real_,
+      TRUE ~ .x
+    )
+  )) %>%
+  mutate(
+    aWATCH  = if_else(aWATCH  == 2, 1, aWATCH),
+    aPENCIL = if_else(aPENCIL == 2, 1, aPENCIL), 
+    across(
+      c(aANIMALS, aSTORY),
+      ~ if_else(.x == 97, NA_real_, .x)
+    )
+  ) %>% ## sum iof binary items 
+  mutate(
+    count = rowSums(across(all_of(binary_items)), na.rm = FALSE),
+    missing_count_cogscore = rowSums(is.na(across(all_of(binary_items))))
+  ) %>% ## other cogscore components plus normalization 
+  mutate(
+    animtot = aANIMALS / 33, 
+    across(c(aWORDDEL1, aWORDDEL2, aWORDDEL3, aPAPER1, aPAPER2, aPAPER3, aWORDIMM), ~ if_else(.x == 97, NA_real_, .x)),
+    aWORDDEL = aWORDDEL1 + aWORDDEL2 + aWORDDEL3,
+    aPAPER = aPAPER1 + aPAPER2 + aPAPER3, 
+    wordtot1 = aWORDIMM / 3,
+    wordtot2 = aWORDDEL / 3,
+    papertot = aPAPER / 3,
+    storytot = aSTORY / 37
+  ) %>% ## get cogscore
+  mutate(
+    COGSCORE = 1.03125 * rowSums(
+      cbind(count, animtot, wordtot1, wordtot2, papertot, storytot),
+      na.rm = FALSE)
+  ) %>%
+  select(ADAMSSID, COGSCORE)
+
+rels_vars <- c( ## for rel score + delayed recall (aRECALLcs)
+  "aMEMORY","aFRDNAME","aFAMNAME","aLASTDAY","aORIENT",
+  "aLOSTOUT","aLOSTIN","aCHORES","aMONEY","aREASON",
+  "aWORDFIND", "aWORDWRG","aFEED","aDRESS","aTOILET","aHOBBYcs","aRECALLcs"
+)
+
+miss1_vars <- c(
+  "aMEMORY","aFRDNAME","aFAMNAME","aWORDFIND","aWORDWRG",
+  "aLASTDAY","aORIENT","aLOSTOUT","aLOSTIN",
+  "aCHORES","aMONEY","aREASON","aHOBBYcs"
+)
+
+relsum_vars <- c(
+  "aMEMORY","aFRDNAME","aFAMNAME","aWORDFIND","aWORDWRG",
+  "aLASTDAY","aORIENT","aLOSTOUT","aLOSTIN","aCHORES",
+  "aMONEY","aREASON","aFEED","aDRESS","aTOILET","aHOBBYcs"
+)
+
+alg1066_rel <- ADAMS1AD_R %>% 
+  left_join(ADAMS1AN_R, by = "ADAMSSID") %>%
+  left_join(ADAMS1AC_R, by = "ADAMSSID") %>%
+  select(
+    ADAMSSID,
+    aMEMORY    = ADDRS1,
+    aLASTDAY   = ADBL1G,
+    aORIENT    = ADDRS2,
+    aLOSTOUT   = ADBL1E,
+    aLOSTIN    = ADBL1D,
+    aCHORES    = ADBL1A,
+    aMONEY     = ADBL1B,
+    aREASON    = ADDRS3,
+    aFEED      = ADBL2EA,
+    aDRESS     = ADBL2DRE,
+    aTOILET    = ADBL2TO,
+    aHOBBYcs   = AC99,
+    aRECALLcs  = ANDELCOR,     
+    aFRDNAME   = ADDRS8,
+    aFAMNAME   = ADDRS8,
+    aWORDFIND  = ADDRS7, 
+    aWORDWRG   = ADDRS7, 
+    aDRESSDIS  = ADBL2DRR, 
+    aTOILETDIS = ADBL2TOR, 
+    aFEEDDIS   = ADBL2EAR, 
+    aCHORESDIS = ADBL1AR 
+  ) %>% ## missing data 
+  mutate(across(
+    all_of(rels_vars),
+    ~ if_else(.x %in% c(97, 98, 99), NA_real_, as.numeric(.x))
+  )) %>% ## recoding items 
+  mutate(
+    across(c(aWORDFIND, aWORDWRG), 
+           ~ case_when(.x == 1 ~ 0,
+                       .x == 2 ~ 0.5,
+                       .x >= 3 ~ 1, 
+                       TRUE ~ NA_real_)), 
+    across(c(aMEMORY, aREASON), 
+           ~ case_when(.x %in% c(1,2) ~ 0,
+                       .x >= 3 ~ 1,
+                       TRUE ~ NA_real_)),
+    aHOBBYcs = case_when(
+      aHOBBYcs == 4 ~ 0,
+      aHOBBYcs %in% c(1, 2, 3) ~ 1,
+      aHOBBYcs %in% c(7, 8) ~ NA_real_,
+      TRUE ~ NA_real_
+    ), 
+    across(c(aFRDNAME, aFAMNAME), 
+           ~  case_when(.x %in% 1:3 ~ 0,
+                        .x == 4 ~ 0.5,
+                        .x %in% c(5, 6) ~ 1,
+                        TRUE ~ NA_real_)), 
+    aORIENT = case_when(
+      aORIENT %in% c(1, 2) ~ 0,
+      aORIENT %in% c(3, 4) ~ 0.5,
+      aORIENT %in% c(5, 6) ~ 1,
+      TRUE ~ NA_real_
+    )
+  ) %>% ## do not count instances when unable due to physical disability 
+  mutate(
+    aDRESS  = if_else(aDRESSDIS  == 0, 0, aDRESS),
+    aTOILET = if_else(aTOILETDIS == 0, 0, aTOILET),
+    aFEED   = if_else(aFEEDDIS   == 0, 0, aFEED),
+    aCHORES = if_else(aCHORESDIS == 0, 0, aCHORES)
+  ) %>% ## create missing and summary scores 
+  mutate( 
+    MISS1 = rowSums(is.na(across(all_of(miss1_vars)))),
+    MISS3 = rowSums(is.na(across(c(aFEED, aDRESS, aTOILET)))),
+    MISSTOT = (MISS3 * 3) + MISS1,
+    U = 23 / (23 - MISSTOT), 
+    S = rowSums(across(all_of(relsum_vars), ~replace_na(.x, 0))),
+    RELSCORE = U * S
+  ) %>%
+  select(ADAMSSID, RELSCORE, aRECALLcs)
+
 # Stacking it up
 
 join_list <- list(
   vdori1, vdmde1, vdmde2, vdmde3, vdmde4, vdmre1, vdmde6, vdexf2, vdexf8, vdexf9,
   vdasp1, vdasp2, vdasp3, vdlfl1, vdlfl2, vdlfl3, vdlfl4, vdlfl5, vdlfl7, vdlfl8,
-  vdvis1, iqcode, blessed, dementia, demographics, sr_health, disability
+  vdvis1, iqcode, blessed, dementia, demographics, sr_health, disability, alg1066_cog, alg1066_rel
 )
 
 tidied <- Reduce(function(x, y) left_join(x, y, by = "ADAMSSID"), join_list) %>%

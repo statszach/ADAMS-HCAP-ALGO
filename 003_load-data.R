@@ -24,6 +24,10 @@ ADAMS1AG_R <- haven::read_sav(fs::path(data_filepath, "ADAMS1AG_R.sav"))
 
 ADAMS1AD_R <- haven::read_sav(fs::path(data_filepath, "ADAMS1AD_R.sav"))
 
+## AD_C has the clinical visit 
+
+ADAMS1AC_R <- haven::read_sav(fs::path(data_filepath, "ADAMS1AC_R.sav"))
+
 ## diagnoses for follow-up waves 
 
 ADAMS1BD_R <- haven::read_sav(fs::path(data_filepath, "ADAMS1BD_R.sav"))
