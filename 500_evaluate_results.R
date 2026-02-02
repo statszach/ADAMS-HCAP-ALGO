@@ -38,6 +38,7 @@ fulldata[, dementia_hcap_num := as.numeric(predicted_hcap == "Dementia")]
 fulldata[, dementia_1066_num := as.numeric(predicted_1066 == "Dementia")]
 
 # survey design 
+fulldata[, weight := scale(weight, center = FALSE, scale = sum(weight)/.N)] ## scale weights to sum to n
 fulldata_design <- svydesign(ids = ~1, weights = ~weight, data = fulldata)
 
 # For diagnosis_true
@@ -54,6 +55,10 @@ prevalence_hcap <- as.numeric(svymean(~dementia_hcap_num, fulldata_design))[1]
 sens_hcap <- fulldata %>% yardstick::sens(truth = diagnosis_true, estimate = predicted_hcap, case_weights = weight) %>% pull(.estimate)
 spec_hcap <- fulldata %>% yardstick::spec(truth = diagnosis_true, estimate = predicted_hcap, case_weights = weight) %>% pull(.estimate)
 acc_hcap <- fulldata %>% yardstick::accuracy(truth = diagnosis_true, estimate = predicted_hcap, case_weights = weight) %>% pull(.estimate)
+tpw_hcap <- fulldata[dementia_hcap_num == 1 & dementia_true_num == 1, sum(weight)]
+tnw_hcap <- fulldata[dementia_hcap_num == 0 & dementia_true_num == 0, sum(weight)]
+fpw_hcap <- fulldata[dementia_hcap_num == 1 & dementia_true_num == 0, sum(weight)]
+fnw_hcap <- fulldata[dementia_hcap_num == 0 & dementia_true_num == 1, sum(weight)]
 
 # For predicted_1066
 totaln_dementia_1066 <- nrow(fulldata[!is.na(dementia_1066_num)])
@@ -65,6 +70,10 @@ sens_1066 <- fulldata %>% yardstick::sens(truth = diagnosis_true, estimate = pre
 spec_1066 <- fulldata %>% yardstick::spec(truth = diagnosis_true, estimate = predicted_1066, case_weights = weight, na_rm = TRUE) %>% pull(.estimate)
 acc_1066 <- fulldata %>% yardstick::accuracy(truth = diagnosis_true, estimate = predicted_1066, case_weights = weight, na_rm = TRUE) %>% pull(.estimate)
 auc_1066 <- fulldata %>% yardstick::roc_auc(truth = diagnosis_true, prob1066, case_weights = weight, na_rm = TRUE) %>% pull(.estimate)
+tpw_1066 <- fulldata[dementia_1066_num == 1 & dementia_true_num == 1, sum(weight)]
+tnw_1066 <- fulldata[dementia_1066_num == 0 & dementia_true_num == 0, sum(weight)]
+fpw_1066 <- fulldata[dementia_1066_num == 1 & dementia_true_num == 0, sum(weight)]
+fnw_1066 <- fulldata[dementia_1066_num == 0 & dementia_true_num == 1, sum(weight)]
 
 # Create the table
 summary_table <- data.table(
@@ -72,11 +81,20 @@ summary_table <- data.table(
   n_dementia = c(n_dementia_true, n_dementia_hcap, n_dementia_1066),
   total_n = c(totaln_dementia_true, totaln_dementia_hcap, totaln_dementia_1066),
   weighted_prevalence = c(prevalence_true, prevalence_hcap, prevalence_1066),
+  true_positives_weighted = c(NA, tpw_hcap, tpw_1066),
+  true_negatives_weighted = c(NA, tnw_hcap, tnw_1066),
+  false_positives_weighted = c(NA, fpw_hcap, fpw_1066),
+  false_negatives_weighted = c(NA, fnw_hcap, fnw_1066),
   weighted_sensitivity = c(NA, sens_hcap, sens_1066),
   weighted_specificity = c(NA, spec_hcap, spec_1066),
   weighted_accuracy = c(NA, acc_hcap, acc_1066),
   auc = c(NA, NA, auc_1066)
 )
+
+## all columns to two decimal places where relevant
+round_cols <- c("true_positives_weighted", "true_negatives_weighted", "false_positives_weighted", "false_negatives_weighted", "weighted_prevalence", 
+                "weighted_sensitivity", "weighted_specificity", "weighted_accuracy", "auc")
+summary_table[, (round_cols) := lapply(.SD, function(x) sprintf("%0.2f", x)), .SDcols = round_cols]
 
 print(summary_table)
 
