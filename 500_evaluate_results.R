@@ -300,7 +300,7 @@ kappas_3cat[, `:=` (value = paste0(sprintf("%.2f", mean), " (", sprintf("%.2f", 
 kappas_3cat <- dcast(kappas_3cat, variable + category ~ type, value.var = "value")
 kappas_3cat <- kappas_3cat[order(variable, category)]
 
-openxlsx::write.xlsx(kappas_3cat, paste0(images_filepath, "kappas_bychar_3cat_", date, ".xlsx"))
+#openxlsx::write.xlsx(kappas_3cat, paste0(images_filepath, "kappas_bychar_3cat_", date, ".xlsx"))
 
 # RISK RATIOS FOR UNDER/OVER DIAGNOSIS -------------------------------------------
 
@@ -333,7 +333,7 @@ get_riskratios <- function(predictor){
                        rr_low = m_params$CI_low[m_select], rr_high = m_params$CI_high[m_select])
     m_dt <- rbind(data.table(cat = paste0(predictor, algo_data[, levels(get(predictor))][1]), rr = 0, rr_low = NA, rr_high = NA), 
                              m_params_dt)
-    m_dt[, `:=` (pred = predictor, type = "Total misclassification")]                             
+    m_dt[, `:=` (pred = predictor, type = "Total differential\nclassification")]                             
 
     ## underdiagnosis risk ratios 
     u_model <- survey::svyglm(as.formula(paste0("underdiagnosed ~ ", predictor)), design = rr_design, family = poisson())
@@ -368,7 +368,7 @@ rr_plot_dt <- copy(rr_results)
 rr_plot_dt[, cat_label := cat][, cat_label := gsub("age_group", "Age Group: ", cat_label)][, cat_label := gsub("gender", "Gender: ", cat_label)] 
 rr_plot_dt[, cat_label := gsub("educ", "Education: ", cat_label)][, cat_label := gsub("race", "Race/ethnicity: ", cat_label)]
 rr_plot_dt[, cat_label := factor(cat_label, levels = rr_plot_dt[, rev(unique(cat_label))])]
-rr_plot_dt[, type := factor(type, levels = c("Total misclassification", "Algorithm < Clinical", "Algorithm > Clinical"))]
+rr_plot_dt[, type := factor(type, levels = c("Total differential\nclassification", "Algorithm < Clinical", "Algorithm > Clinical"))]
 
 ## create spacers for discrete axis 
 cats <- unique(str_extract(rr_plot_dt[, levels(cat_label)], ".*?(?=:)"))
