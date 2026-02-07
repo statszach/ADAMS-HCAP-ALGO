@@ -94,9 +94,21 @@ summary_table <- data.table(
 ## all columns to two decimal places where relevant
 round_cols <- c("true_positives_weighted", "true_negatives_weighted", "false_positives_weighted", "false_negatives_weighted", "weighted_prevalence", 
                 "weighted_sensitivity", "weighted_specificity", "weighted_accuracy", "auc")
-summary_table[, (round_cols) := lapply(.SD, function(x) sprintf("%0.2f", x)), .SDcols = round_cols]
+summary_table[, (round_cols) := lapply(.SD, function(x) ifelse(is.na(x), "", sprintf("%0.2f", x))), .SDcols = round_cols]
 
-print(summary_table)
+## clean names 
+setnames(summary_table, c("category", "n_dementia", "total_n", "weighted_prevalence", "true_positives_weighted", "true_negatives_weighted", 
+                    "false_positives_weighted", "false_negatives_weighted", "weighted_sensitivity", "weighted_specificity", 
+                    "weighted_accuracy", "auc"), 
+         c("Category", "N with Dementia", "Total N", "Weighted Prevalence", "Weighted True Positives", 
+           "Weighted True Negatives", "Weighted False Positives", "Weighted False Negatives", 
+           "Weighted Sensitivity", "Weighted Specificity", "Weighted Accuracy", "AUC"))
+summary_table[, Category := case_when(
+  Category == "diagnosis_true" ~ "Clinical Diagnosis",
+  Category == "predicted_hcap" ~ "HCAP Algorithm",
+  Category == "predicted_1066" ~ "10/66 Algorithm")]        
+
+openxlsx::write.xlsx(summary_table, paste0(images_filepath, "diagnosis_summary_table_", date, ".xlsx"))
 
 # MAKE CONTINGENCY TABLES --------------------------------------------------
 
@@ -155,28 +167,31 @@ make_contingency_plot <- function(algorithm_data = algo_data, row){
 
 all_plots <- lapply(1:nrow(version_map), function(x) make_contingency_plot(row = x))
 
-## create plot grids 
+## create plots
 
-## for diagnosis based on adjusted ADAMS, ADAMS, adjusted ADAMS (2) - using future for CIND with medical conditions
+## main analysis is adjusted ADAMS for clinical diagnosis normative sample also based on adjusted ADAMS 
+concordance_main <- all_plots[[1]] + all_plots[[13]] + 
+    plot_layout(ncol = 1) + 
+    plot_annotation(tag_levels = 'A', tag_suffix = '.')
 
-## predictions for normative sample with adjusted ADAMS
-grid1 <- wrap_plots(all_plots[c(1:3, 13:15)]) + plot_layout(nrow = 2)
+ggsave(paste0(images_filepath, "contingency_table_main_", date, ".pdf"), concordance_main, width = 5, height = 5)
 
-## predictions for normative sample with ADAMS 
-grid2 <- wrap_plots(all_plots[c(4:6, 16:18)]) + plot_layout(nrow = 2)
+## sensitivity analysis comparing different gold standard options
+concordance_clinical_sensitivity <- patchwork::wrap_elements(grid::textGrob("Main analysis")) +
+    patchwork::wrap_elements(grid::textGrob("Standard ADAMS diagnosis")) +
+    patchwork::wrap_elements(grid::textGrob("Adjustment for CIND with \nmedical conditions")) +
+    all_plots[[1]] + all_plots[[2]] + all_plots[[3]] +
+    plot_layout(nrow = 2, heights = c(0.15, 1))
 
-## predictions for normative sample with adjusted ADAMS v2 
-grid3 <- wrap_plots(all_plots[c(7:9, 19:21)]) + plot_layout(nrow = 2)
+ggsave(paste0(images_filepath, "contingency_table_clinical_sensitivity_", date, ".pdf"), concordance_clinical_sensitivity, width = 10, height = 4)
 
-## predictions for normative sample with adjusted ADAMS and additional exclusion of those with IADL limitations 
-grid4 <- wrap_plots(all_plots[c(10:12, 22:24)]) + plot_layout(nrow = 2)
+## sensitivity analysis using different versions of the noarmative sample 
+concordance_normative_sensitivity <- patchwork::wrap_elements(grid::textGrob("Main analysis")) +
+    patchwork::wrap_elements(grid::textGrob("Exclude IADL impairment \nfrom normative sample")) +
+    all_plots[[1]] + all_plots[[10]] +
+    plot_layout(nrow = 2, heights = c(0.15, 1))
 
-## save all options in same file 
-pdf(paste0(images_filepath, "all_contingency_tables_", date, ".pdf"), width = 10, height = 5)
-grid1; grid2; grid3; grid4
-dev.off()
-
-## based on this we are going to take adjusted ADAMS with the adjusted ADAMS normative sample as our main analysis
+ggsave(paste0(images_filepath, "contingency_table_normative_sensitivity_", date, ".pdf"), concordance_normative_sensitivity, width = 7, height = 4)
 
 # LOOK AT OFF DIAGONALS -----------------------------------------------------------
 
