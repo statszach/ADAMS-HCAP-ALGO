@@ -445,6 +445,7 @@ disability <- ADAMS1TRK_R %>%
   dplyr::select(ADAMSSID, adl, iadl)
 
 ## creating of variables for 10/66 algorithm 
+## adapted from https://github.com/chrissoria/1066_Algorithm/tree/main/ADAMS
 
 binary_items <- c(
   "aPENCIL","aWATCH","aREPEAT","aTOWN","aCHIEF","aSTREET",
