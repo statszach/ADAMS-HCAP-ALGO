@@ -9,12 +9,22 @@ source(here::here(paste0(code_filepath, "001_libraries.R")))
 source(here::here(paste0(code_filepath, "002_directories.R")))
 
 tidied <- readr::read_rds(here::here(rds_filepath, "010_tidy-data.rds"))
+fscores <- readr::read_rds(paste0(rds_filepath, "fscores.rds"))
 
 # SET UP TRAINING DATA ------------------------------------------------------------------
 
 data_for1066 <- data.table(tidied)
+data_for1066 <- as.data.table(merge(data_for1066, fscores, by = "ADAMSSID"))
+setnames(data_for1066, c("vdori1", "vdvis1"), c("ORI", "VIS"))
+
+## impute missing components of the 1066 algorithm  
+data_for1066 <- simputation::impute_pmm(data_for1066, EXF ~ MEM + LFL + ORI)
+data_for1066 <- simputation::impute_pmm(data_for1066, VIS ~ MEM + EXF + LFL + ORI)
+data_for1066 <- simputation::impute_pmm(data_for1066, aRECALLcs ~ MEM + EXF + LFL + ORI + VIS)
+data_for1066 <- simputation::impute_pmm(data_for1066, COGSCORE ~ MEM + EXF + LFL + ORI + VIS + aRECALLcs)
+
+## subset to only variables needed for the 1066 algorithm 
 data_for1066 <- data_for1066[, .(ADAMSSID, diagnosis_adjusted, COGSCORE, RELSCORE, aRECALLcs)]
-data_for1066 <- data_for1066[complete.cases(data_for1066)]
 
 # Create binary outcome for classification: Dementia vs. No Dementia
 data_for1066[, dementia_binary := factor(ifelse(diagnosis_adjusted == "Dementia", "Dementia", "No Dementia"), levels = c("No Dementia", "Dementia"))]
