@@ -363,6 +363,11 @@ get_riskratios <- function(predictor){
 
 rr_results <- rbindlist(lapply(predictors, get_riskratios))
 
+## print for results 
+rr_results[grepl("90", cat) & grepl("<", type), .(cat, exp(rr), exp(rr_low), exp(rr_high))]
+rr_results[grepl("College", cat) & grepl("<", type), .(cat, exp(rr), exp(rr_low), exp(rr_high))]
+rr_results[grepl("Black", cat) & grepl("<", type), .(cat, exp(rr), exp(rr_low), exp(rr_high))]
+
 ## create necessary factors with correct order for plotting
 rr_plot_dt <- copy(rr_results)
 rr_plot_dt[, cat_label := cat][, cat_label := gsub("age_group", "Age Group: ", cat_label)][, cat_label := gsub("gender", "Gender: ", cat_label)] 

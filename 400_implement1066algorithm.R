@@ -17,6 +17,10 @@ data_for1066 <- data.table(tidied)
 data_for1066 <- as.data.table(merge(data_for1066, fscores, by = "ADAMSSID"))
 setnames(data_for1066, c("vdori1", "vdvis1"), c("ORI", "VIS"))
 
+## amount of missing data for each variable
+missing_data_summary <- data_for1066[, lapply(.SD, function(x) sum(is.na(x))), .SDcols = c("MEM", "LFL", "ORI", "EXF", "VIS", "blessed", "iqcode_mean", "aRECALLcs", "COGSCORE")]
+print(missing_data_summary)
+
 ## impute missing components of the 1066 algorithm  
 data_for1066 <- simputation::impute_pmm(data_for1066, EXF ~ MEM + LFL + ORI)
 data_for1066 <- simputation::impute_pmm(data_for1066, VIS ~ MEM + EXF + LFL + ORI)
