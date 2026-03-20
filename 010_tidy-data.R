@@ -38,9 +38,9 @@ vdmde1 <- ADAMS1AN_R %>%
 # it's a renaming of ANWM1A
 
 vdmde2 <- ADAMS1AN_R %>% 
-  dplyr::select(ADAMSSID, ANWM1A) %>% 
-  dplyr::mutate(ANWM1A = na_if(ANWM1A, 97)) %>% 
-  dplyr::rename(vdmde2 = ANWM1A)
+  dplyr::select(ADAMSSID, ANWM2A) %>% 
+  dplyr::mutate(ANWM2A = na_if(ANWM2A, 97)) %>% 
+  dplyr::rename(vdmde2 = ANWM2A)
 
 # vdmde3 is the MMSE 3 word delayed recall
 # I believe this is the sum of items 13, 14, and 15 because
@@ -72,9 +72,9 @@ vdmde4 <- ADAMS1AN_R %>%
 # this test is ONLY in ADAMS, not in HCAP.
 
 vdmde6 <- ADAMS1AN_R %>% 
-  dplyr::select(ADAMSSID, ANWM1B) %>% 
-  dplyr::mutate(ANWM1B = na_if(ANWM1B, 97)) %>% 
-  dplyr::rename(vdmde6 = ANWM1B)
+  dplyr::select(ADAMSSID, ANWM2B) %>% 
+  dplyr::mutate(ANWM2B = na_if(ANWM2B, 97)) %>% 
+  dplyr::rename(vdmde6 = ANWM2B)
 
 # vdmre1 is the CERAD word list recognition
 # it is the sum of ANRECYES and ANRECNO
