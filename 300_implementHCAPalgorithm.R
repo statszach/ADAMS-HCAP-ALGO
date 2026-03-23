@@ -13,6 +13,9 @@ fscores <- readr::read_rds(paste0(rds_filepath, "fscores.rds"))
 
 domain_scores <- c("ORI", "MEM", "EXF", "LFL", "VIS")
 
+## make sure that clusters work correctly
+options(survey.lonely.psu = "adjust")
+
 # COMBINE DATA -----------------------------------------------------------
 
 data <- as.data.table(merge(tidied, fscores, by = "ADAMSSID"))
@@ -39,9 +42,21 @@ data[, moderate_function := as.numeric(iqcode_mean > 3 | blessed > 0)]
 
 # CLASSIFICATION -----------------------------------------------------------
 
-classify <- function(all_data = data, normative_data){
+classify <- function(all_data = data, normative_data_subset){
     
-    dt <- copy(all_data); normative_dt <- copy(normative_data)
+    ## Capture the subset condition as an expression so callers can pass, e.g.,
+    ## diagnosis_adjusted == "Normal" instead of pre-filtering a data table.
+    subset_expr <- substitute(normative_data_subset)
+    dt <- copy(all_data)
+    ## Build the full survey design first, then evaluate the subset against the
+    ## analysis data and apply it to the design so the normative rows stay aligned
+    ## with the survey structure.
+    full_design <- survey::svydesign(ids = ~cluster, weights = ~weight, strata = ~strata, data = dt, nest = TRUE)
+    normative_subset <- eval(subset_expr, envir = dt, enclos = parent.frame())
+    blom_design_subset <- subset(full_design, normative_subset)
+    ## Pull the subsetted design variables back into a data.table for the rest of
+    ## the modeling code, which expects an ordinary table.
+    normative_dt <- copy(as.data.table(blom_design_subset$variables))
 
     ## check if need to adjust max age knot
     max_age <- normative_dt[, max(age)]
@@ -57,9 +72,9 @@ classify <- function(all_data = data, normative_data){
     normative_dt[, paste0(domain_scores, "_b") := lapply(.SD, blom_transform), .SDcols = domain_scores]
 
     ## get blom transformation in full sample via parametric model
-    blom_design <- survey::svydesign(ids = ~1, weights = ~weight, data = normative_dt)
+    blom_design <- survey::svydesign(ids = ~cluster, weights = ~weight, strata = ~strata, data = normative_dt, nest = TRUE)
     blom_models <- lapply(domain_scores, function(score){
-        quantiles <- survey::svyquantile(as.formula(paste0("~", score)), design = blom_design, quantiles = c(0.05, 0.35, 0.65, 0.95))
+        quantiles <- survey::svyquantile(as.formula(paste0("~", score)), design = blom_design, quantiles = c(0.05, 0.35, 0.65, 0.95), survey.lonely.psu="adjust")
         knot_locations <- unique(quantiles[[1]][,1])
         knot_locations <- knot_locations[!knot_locations %in% c(normative_dt[, min(get(score))], normative_dt[, max(get(score))])] ## knots can't be the score min or max
         formula <- paste0(score, "_b ~ splines::ns(", score, ", knots = c(", paste(knot_locations, collapse = ", "), "))")
@@ -83,10 +98,13 @@ classify <- function(all_data = data, normative_data){
     interaction_terms <- combn(adjust_vars, 2, FUN = function(x) paste0(x[1], ":", x[2]))
 
     ## special case no age/gender interaction or age/race interaction when excluding iadls
-    if (normative_dt[, length(unique(iadl))] == 1) interaction_terms <- interaction_terms[!interaction_terms %in% c("splines::ns(age, knots = c(78, 86, 94)):female",
-                                                                                             "splines::ns(age, knots = c(78, 86, 94)):race")]
+    age_term <- adjust_vars[grepl("^splines::ns\\(age,", adjust_vars)]
+    if (normative_dt[, length(unique(iadl))] == 1) interaction_terms <- interaction_terms[!interaction_terms %in% c(
+        paste0(age_term, ":female"),
+        paste0(age_term, ":race")
+    )]
     ## normative models
-    normative_design <- survey::svydesign(ids = ~1, weights = ~weight, data = normative_dt)
+    normative_design <- survey::svydesign(ids = ~cluster, weights = ~weight, strata = ~strata, data = normative_dt, nest = TRUE, survey.lonely.psu="adjust")
     norms_models <- lapply(domain_scores, function(score){
         formula <- paste0(score, "_b_pred ~ ", paste(c(adjust_vars, interaction_terms), collapse = " + "))
         return(survey::svyglm(formula, design = normative_design))
@@ -148,14 +166,14 @@ classify <- function(all_data = data, normative_data){
     return(dt)
 }
 
-class_dt1 <- classify(all_data = data, normative_data = data[diagnosis_adjusted == "Normal"])
-class_dt2 <- classify(all_data = data, normative_data = data[diagnosis_adams == "Normal"])
-class_dt3 <- classify(all_data = data, normative_data = data[diagnosis_adjusted2 == "Normal"])
-class_dt4 <- classify(all_data = data, normative_data = data[diagnosis_adjusted == "Normal" & iadl == 0])
+class_dt1 <- classify(all_data = data, normative_data_subset = diagnosis_adjusted == "Normal")
+class_dt2 <- classify(all_data = data, normative_data_subset = diagnosis_adams == "Normal")
+class_dt3 <- classify(all_data = data, normative_data_subset = diagnosis_adjusted2 == "Normal")
+class_dt4 <- classify(all_data = data, normative_data_subset = diagnosis_adjusted == "Normal" & iadl == 0)
 
 # PRINT RESULTS -----------------------------------------------------------
 
-mean_design <- survey::svydesign(ids = ~1, weights = ~weight, data = data)
+mean_design <- survey::svydesign(ids = ~cluster, weights = ~weight, strata = ~strata, data = data, nest = TRUE)
 
 print_results <- function(data){
     ## numbers for figure
@@ -184,7 +202,7 @@ print_results <- function(data){
     message(paste0("Percentage no self-rated poor memory ", sprintf("%.1f%%", (data[num_impaired_domains == 1 & moderate_function == 0 & poormem == 0, sum(weight)]) / (data[num_impaired_domains == 1 & moderate_function == 0, sum(weight)]) * 100)))
 
     ## calculate prevalence of dementia and MCI
-    mean_design <- survey::svydesign(ids = ~1, weights = ~weight, data = data)
+    mean_design <- survey::svydesign(ids = ~cluster, weights = ~weight, strata = ~strata, data = data, nest = TRUE)
     dementia_prevalence <- survey::svyciprop(~dementia, design = mean_design)
     mci_prevalence <- survey::svyciprop(~mci, design = mean_design)
     message(paste0("Dementia prevalence: ", sprintf("%.1f%%", dementia_prevalence*100), " (", sprintf("%.1f%%", attr(dementia_prevalence, "ci")[[1]]*100), ", ", sprintf("%.1f%%", attr(dementia_prevalence, "ci")[[2]]*100), ")"))

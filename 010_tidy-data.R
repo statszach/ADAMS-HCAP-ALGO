@@ -389,7 +389,7 @@ dementia <- ADAMS1AD_R %>%
 
 demographics <- ADAMS1TRK_R %>%
   dplyr::filter(!AMONTH == 97) %>% ## exlcude those without Wave A assessment
-  dplyr::select(ADAMSSID, age = AAGE, GENDER, ETHNIC, edyrs = EDYRS, degree = DEGREE, weight = AASAMPWT_F) %>%
+  dplyr::select(ADAMSSID, age = AAGE, GENDER, ETHNIC, edyrs = EDYRS, degree = DEGREE, weight = AASAMPWT_F, strata = SESTRAT, cluster = SECLUST) %>%
   dplyr::mutate(age = na_if(age, 997), 
                 age2 = age^2,
                 edyrs = na_if(edyrs, 99), 
@@ -403,7 +403,7 @@ demographics <- ADAMS1TRK_R %>%
                                           degree == 4 ~ "College graduate",
                                           degree %in% 5:6 ~ "Post-graduate"),
                                 levels = c("Less than high school or GED", "High school graduate", "College graduate", "Post-graduate"))) %>%
-  dplyr::select(ADAMSSID, age, age2, female, race, edyrs, degree, weight) 
+  dplyr::select(ADAMSSID, age, age2, female, race, edyrs, degree, weight, strata, cluster) 
 
 
   ## Self rated health 

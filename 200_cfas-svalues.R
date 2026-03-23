@@ -28,39 +28,39 @@ psych::describe(mem_data)
 mem_model <- mplusObject(
   MODEL = "
   
-     mem BY vdmde1@2.42053;
-     mem BY vdmde2@3.78470;
-     mem BY vdmde3@1.43515;
-     mem BY vdmde4@2.66786;
-     mem BY vdmre1cat@1.81536;
-     mem BY vdmde6@3.75506;
-     lm BY vdmde2@2.07174 (19);
-     lm BY vdmde6@2.07174 (19);
+     mem BY vdmde1@2.41338;
+     mem BY vdmde2@3.51722;
+     mem BY vdmde3@1.44129;
+     mem BY vdmde4@2.65701;
+     mem BY vdmre1cat@1.82445;
+     mem BY vdmde6@3.65341;
+     lm BY vdmde2@2.12302 (19);
+     lm BY vdmde6@2.12302 (19);
 
      mem WITH lm@0;
 
      [ vdmde1@3.67561 ];
-     [ vdmde2@6.86468 ];
-     [ vdmde4@5.13934 ];
-     [ vdmde6@6.98423 ];
+     [ vdmde2@4.81642 ];
+     [ vdmde4@5.13916 ];
+     [ vdmde6@4.99042 ];
 
-     [ vdmde3$1@-0.80624 ];
-     [ vdmde3$2@-0.07685 ];
-     [ vdmde3$3@1.10999 ];
-     [ vdmre1cat$1@-2.70659 ];
-     [ vdmre1cat$2@-2.54413 ];
-     [ vdmre1cat$3@-1.92582 ];
-     [ vdmre1cat$4@-1.55445 ];
-     [ vdmre1cat$5@-0.97542 ];
-     [ vdmre1cat$6@-0.72481 ];
-     [ vdmre1cat$7@-0.30447 ];
-     [ vdmre1cat$8@0.17001 ];
-     [ vdmre1cat$9@1.03680 ];
+     [ vdmde3$1@-0.80857 ];
+     [ vdmde3$2@-0.07709 ];
+     [ vdmde3$3@1.11318 ];
+     [ vdmre1cat$1@-2.71696 ];
+     [ vdmre1cat$2@-2.55399 ];
+     [ vdmre1cat$3@-1.93314 ];
+     [ vdmre1cat$4@-1.56035 ];
+     [ vdmre1cat$5@-0.97938 ];
+     [ vdmre1cat$6@-0.72746 ];
+     [ vdmre1cat$7@-0.30547 ];
+     [ vdmre1cat$8@0.17108 ];
+     [ vdmre1cat$9@1.04096 ];
 
-     vdmde1@1.56337;
-     vdmde2@5.07884;
-     vdmde4@5.12281;
-     vdmde6@4.44574;
+     vdmde1@1.59828;
+     vdmde2@3.95166;
+     vdmde4@5.17523;
+     vdmde6@3.63400;
      mem@1;
      lm@1;
   

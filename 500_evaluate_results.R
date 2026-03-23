@@ -39,7 +39,7 @@ fulldata[, dementia_1066_num := as.numeric(predicted_1066 == "Dementia")]
 
 # survey design 
 fulldata[, weight := scale(weight, center = FALSE, scale = sum(weight)/.N)] ## scale weights to sum to n
-fulldata_design <- svydesign(ids = ~1, weights = ~weight, data = fulldata)
+fulldata_design <- svydesign(ids = ~cluster, weights = ~weight, strata = ~strata, data = fulldata, nest = TRUE)
 
 # For diagnosis_true
 totaln_dementia_true <- nrow(fulldata[!is.na(dementia_true_num)])
@@ -136,7 +136,7 @@ make_contingency_plot <- function(algorithm_data = algo_data, row){
     setnames(table_dt, c("algo", "truth", "freq"))
 
     ## get kappas 
-    design <- survey::svydesign(ids = ~1, weights = ~weight, data = data)
+    design <- survey::svydesign(ids = ~cluster, weights = ~weight, strata = ~strata, nest = TRUE, data = data)
     weighted_table <- survey::svytable(as.formula(paste0("~", algo, "+", truth)), design = design)
     kappas <- vcd::Kappa(weighted_table); kappas_confint <- confint(kappas)
 
@@ -259,7 +259,7 @@ get_kappa_bycat <- function(algorithm_data, truth, algo, cat){
     data[, weight := scale(weight, center = FALSE, scale = sum(weight)/.N), by = cat] ## scale weights to sum to n
     
     ## get kappas 
-    designs <- lapply(data[, levels(get(cat))], function(x) survey::svydesign(ids = ~1, weights = ~weight, data = data[get(cat) == x]))
+    designs <- lapply(data[, levels(get(cat))], function(x) survey::svydesign(ids = ~cluster, weights = ~weight, strata = ~strata, nest = TRUE, data = data, subset = get(cat) == x))
     weighted_tables <- lapply(designs, function(x) survey::svytable(as.formula(paste0("~", algo, "+", truth)), design = x))
     kappas <- lapply(weighted_tables, function(x) vcd::Kappa(x))
     kappas_confint <- lapply(kappas, confint)
@@ -318,7 +318,7 @@ algo_data[, diagnosis := relevel(diagnosis, ref = "Normal")]
 predictors <- c("age_group", "gender", "educ", "race")
 
 ## survey design
-rr_design <- survey::svydesign(ids = ~1, weights = ~weight, data = algo_data)
+rr_design <- survey::svydesign(ids = ~cluster, weights = ~weight, strata = ~strata, nest = TRUE, data = algo_data)
 
 ## function to get risk ratios
 get_riskratios <- function(predictor){
